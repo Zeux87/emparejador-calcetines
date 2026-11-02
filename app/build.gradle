@@ -1,0 +1,48 @@
+plugins {
+    id 'com.android.application'
+}
+
+def numeroCompilacion = Integer.parseInt(System.getenv('BUILD_NUMBER') ?: '1')
+
+android {
+    namespace 'es.pablo.calcetines'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'es.pablo.calcetines'
+        minSdk 26
+        targetSdk 34
+        versionCode numeroCompilacion
+        versionName "1.0.${numeroCompilacion}"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('calcetines.jks')
+            storePassword 'calcetines'
+            keyAlias 'calcetines'
+            keyPassword 'calcetines'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
+}

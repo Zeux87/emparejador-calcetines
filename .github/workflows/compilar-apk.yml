@@ -1,0 +1,60 @@
+name: Compilar APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compilar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Instalar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Compilar el APK
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          set -o pipefail
+          gradle assembleRelease --no-daemon --stacktrace 2>&1 | tee compilacion.log
+
+      - name: Mostrar errores de compilación
+        if: failure()
+        run: |
+          grep -E "error:|e: |FAILURE|What went wrong" -A 3 compilacion.log | head -n 60 | while IFS= read -r l; do
+            echo "::error::${l//%/%25}"
+          done
+
+      - name: Renombrar el APK
+        run: cp app/build/outputs/apk/release/app-release.apk "Calcetines-1.0.${{ github.run_number }}.apk"
+
+      - name: Guardar el APK en la ejecución
+        uses: actions/upload-artifact@v4
+        with:
+          name: Calcetines-1.0.${{ github.run_number }}
+          path: Calcetines-*.apk
+
+      - name: Publicar la versión
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v1.0.${{ github.run_number }}" \
+            "Calcetines-1.0.${{ github.run_number }}.apk" \
+            --title "Calcetines 1.0.${{ github.run_number }}" \
+            --notes "Descarga el archivo .apk desde el móvil e instálalo. Si Android lo pide, permite instalar apps de este origen."

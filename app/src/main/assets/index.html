@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Calcetines</title>
+<style>
+  :root {
+    --fondo: #F3F0EA;
+    --superficie: #FFFFFF;
+    --superficie-2: #EAE5DC;
+    --texto: #1E1C1A;
+    --texto-2: #6B655D;
+    --acento: #D9512C;
+    --acento-texto: #FFFFFF;
+    --borde: #DDD6CA;
+    --ok: #2E8B57;
+    --aviso: #C07A00;
+    --sombra: 0 1px 2px rgba(0,0,0,.06), 0 4px 14px rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fondo: #121212;
+      --superficie: #1D1C1B;
+      --superficie-2: #2A2826;
+      --texto: #F1EEE8;
+      --texto-2: #A69F95;
+      --acento: #F06A43;
+      --borde: #34312E;
+      --sombra: none;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--texto);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 16px; }
+  body { overscroll-behavior: none; }
+  button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+  .oculto { display: none !important; }
+
+  /* ---------- inicio ---------- */
+  #inicio { max-width: 560px; margin: 0 auto; padding: 28px 18px 32px; display: flex; flex-direction: column; gap: 18px; min-height: 100%; }
+  .cabecera { display: flex; align-items: center; gap: 14px; }
+  .cabecera svg { width: 52px; height: 52px; flex: none; }
+  .cabecera h1 { margin: 0; font-size: 1.7rem; letter-spacing: -.02em; }
+  .cabecera p { margin: 2px 0 0; color: var(--texto-2); font-size: .95rem; }
+  .botones { display: grid; gap: 10px; }
+  .boton { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; border-radius: 16px;
+    font-weight: 600; font-size: 1.05rem; padding: 0 18px; }
+  .boton svg { width: 24px; height: 24px; }
+  .boton.principal { background: var(--acento); color: var(--acento-texto); box-shadow: var(--sombra); }
+  .boton.secundario { background: var(--superficie); border: 1px solid var(--borde); }
+  .tarjeta { background: var(--superficie); border: 1px solid var(--borde); border-radius: 18px; padding: 16px 18px; box-shadow: var(--sombra); }
+  .tarjeta h2 { margin: 0 0 10px; font-size: 1rem; }
+  .consejos { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+  .consejos li { display: flex; gap: 10px; align-items: flex-start; color: var(--texto-2); font-size: .95rem; line-height: 1.35; }
+  .consejos b { color: var(--texto); font-weight: 600; }
+  .consejos .ic { flex: none; width: 26px; height: 26px; border-radius: 8px; background: var(--superficie-2);
+    display: grid; place-items: center; font-size: .85rem; }
+  .aviso-act { border-color: var(--acento); }
+  .aviso-act .fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .aviso-act button { background: var(--acento); color: var(--acento-texto); border-radius: 12px; padding: 10px 14px; font-weight: 600; }
+  .pie { margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--texto-2); font-size: .85rem; }
+  .pie button { color: var(--acento); font-weight: 600; padding: 8px 0; }
+  #estadoAct { color: var(--texto-2); font-size: .85rem; min-height: 1.2em; }
+
+  /* ---------- resultado ---------- */
+  #resultado { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--fondo); }
+  .barra { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--fondo); }
+  .barra .titulo { flex: 1; min-width: 0; }
+  .barra .titulo b { display: block; font-size: 1.05rem; }
+  .barra .titulo span { color: var(--texto-2); font-size: .85rem; }
+  .icono-btn { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none; }
+  .icono-btn svg { width: 24px; height: 24px; }
+  .icono-btn:active { background: var(--superficie-2); }
+  #caja { flex: 1; position: relative; overflow: hidden; background: #000; touch-action: none; }
+  #lienzo { position: absolute; left: 0; top: 0; transform-origin: 0 0; image-rendering: auto; }
+  #info { position: absolute; left: 12px; right: 12px; bottom: 12px; background: rgba(20,20,20,.86); color: #fff;
+    border-radius: 14px; padding: 10px 14px; font-size: .95rem; display: flex; align-items: center; gap: 10px; pointer-events: none; }
+  #info .punto { width: 14px; height: 14px; border-radius: 50%; flex: none; border: 2px solid #fff; }
+  #info.con-boton { pointer-events: auto; }
+  #info button { margin-left: auto; background: #fff; color: #111; border-radius: 10px; padding: 7px 12px; font-weight: 600; font-size: .9rem; }
+  .herramientas { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: var(--superficie);
+    border-top: 1px solid var(--borde); }
+  .seg { display: flex; background: var(--superficie-2); border-radius: 12px; padding: 3px; flex: 1 1 260px; }
+  .seg button { flex: 1; padding: 9px 6px; border-radius: 9px; font-size: .9rem; color: var(--texto-2); }
+  .seg button.activo { background: var(--superficie); color: var(--texto); font-weight: 600; box-shadow: var(--sombra); }
+  .chip { display: flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 12px; border: 1px solid var(--borde); font-size: .9rem; font-weight: 600; }
+  .chip svg { width: 18px; height: 18px; }
+  .chip.activo { background: var(--acento); border-color: var(--acento); color: var(--acento-texto); }
+  .etiqueta-seg { width: 100%; font-size: .78rem; color: var(--texto-2); margin: 0 0 -4px 2px; }
+
+  /* ---------- cargando ---------- */
+  #cargando { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: grid; place-items: center; z-index: 10; }
+  #cargando .caja { background: var(--superficie); border-radius: 18px; padding: 22px 26px; display: flex; align-items: center; gap: 14px; }
+  .rueda { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--superficie-2); border-top-color: var(--acento); animation: g 0.9s linear infinite; }
+  @keyframes g { to { transform: rotate(360deg); } }
+  #toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); background: #222; color: #fff; padding: 10px 16px;
+    border-radius: 12px; font-size: .9rem; z-index: 20; max-width: 90vw; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- =============================== INICIO =============================== -->
+<section id="inicio">
+  <div class="cabecera">
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <rect width="64" height="64" rx="16" fill="#D9512C"/>
+      <path d="M17 12h12v22l9 9a6 6 0 0 1-8.5 8.5L19 41a6 6 0 0 1-2-4.5z" fill="#FFF"/>
+      <path d="M35 12h12v22l9 9a6 6 0 0 1-8.5 8.5L37 41a6 6 0 0 1-2-4.5z" fill="#FFD9C7" transform="translate(-4 0)"/>
+      <rect x="17" y="12" width="12" height="5" fill="#F2B8A5"/>
+      <rect x="31" y="12" width="12" height="5" fill="#E89E86"/>
+    </svg>
+    <div>
+      <h1>Calcetines</h1>
+      <p>Haz una foto y te digo qué calcetines van juntos.</p>
+    </div>
+  </div>
+
+  <div id="avisoAct" class="tarjeta aviso-act oculto">
+    <div class="fila">
+      <div><b>Hay una versión nueva</b><br><span id="avisoActTxt" style="color:var(--texto-2);font-size:.9rem"></span></div>
+      <button id="btnInstalar">Actualizar</button>
+    </div>
+  </div>
+
+  <div class="botones">
+    <button class="boton principal" id="btnCamara">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      Hacer foto
+    </button>
+    <button class="boton secundario" id="btnGaleria">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>
+      Elegir de la galería
+    </button>
+  </div>
+  <input type="file" id="entradaCamara" accept="image/*" capture="environment" class="oculto">
+  <input type="file" id="entradaGaleria" accept="image/*" class="oculto">
+
+  <div class="tarjeta">
+    <h2>Para que acierte</h2>
+    <ul class="consejos">
+      <li><span class="ic">1</span><span><b>Extiende los calcetines</b> sin que se toquen ni se monten unos encima de otros.</span></li>
+      <li><span class="ic">2</span><span><b>Fondo liso de tono medio</b>: suelo de madera, manta gris… Evita fondos blancos o negros.</span></li>
+      <li><span class="ic">3</span><span><b>Foto desde arriba</b>, con todos dentro y con buena luz, sin sombras fuertes.</span></li>
+      <li><span class="ic">4</span><span>Si alguno sale mal, pulsa <b>Corregir</b> y toca los dos calcetines que van juntos.</span></li>
+    </ul>
+  </div>
+
+  <div class="pie">
+    <span id="version">Versión —</span>
+    <button id="btnBuscar">Buscar actualizaciones</button>
+  </div>
+  <div id="estadoAct"></div>
+</section>
+
+<!-- =============================== RESULTADO =============================== -->
+<section id="resultado" class="oculto">
+  <div class="barra">
+    <button class="icono-btn" id="btnVolver" aria-label="Volver">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="titulo"><b id="resumen">—</b><span id="subresumen"></span></div>
+    <button class="icono-btn" id="btnCompartir" aria-label="Compartir">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg>
+    </button>
+    <button class="icono-btn" id="btnNueva" aria-label="Nueva foto">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+    </button>
+  </div>
+  <div id="caja">
+    <canvas id="lienzo"></canvas>
+    <div id="info" class="oculto"></div>
+  </div>
+  <div class="herramientas">
+    <p class="etiqueta-seg">Exigencia al emparejar</p>
+    <div class="seg" id="exigencia">
+      <button data-u="0.45">Estricta</button>
+      <button data-u="0.6" class="activo">Normal</button>
+      <button data-u="0.8">Flexible</button>
+    </div>
+    <button class="chip" id="btnCorregir">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>
+      Corregir
+    </button>
+  </div>
+</section>
+
+<div id="cargando" class="oculto"><div class="caja"><div class="rueda"></div><span id="cargandoTxt">Buscando parejas…</span></div></div>
+<div id="toast" class="oculto"></div>
+
+<script src="emparejador.js"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const app = window.AndroidApp || null;
+
+  const PALETA = ['#FF3B30', '#34C759', '#007AFF', '#FFCC00', '#FF2DFF', '#00E5FF', '#FF9500', '#8E5BFF',
+    '#00FF9C', '#FF6FAE', '#B4FF39', '#4B6BFF', '#FFB37A', '#00B3A6', '#C8A2FF'];
+  const GRIS = '#AAAAAA';
+
+  const E = {
+    analisis: null,     // resultado de Emparejador.analizar
+    base: null,         // ImageData de la foto
+    anillos: null,      // por calcetín: {color: Int32Array, negro: Int32Array}
+    mapa: null,         // Int32Array: índice de calcetín + 1 (cuerpo o anillo)
+    pareja: null,       // Int32Array: pareja de cada calcetín o -1
+    segura: null,       // Uint8Array
+    umbral: 0.6,
+    corregir: false,
+    sel: -1,
+  };
+
+  /* ---------------------------------------------------------- utilidades */
+  let tToast = 0;
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.remove('oculto');
+    clearTimeout(tToast);
+    tToast = setTimeout(() => t.classList.add('oculto'), 2600);
+  }
+  function mostrar(vista) {
+    $('inicio').classList.toggle('oculto', vista !== 'inicio');
+    $('resultado').classList.toggle('oculto', vista !== 'resultado');
+    if (vista === 'resultado') ajustarVista(true);
+  }
+  function cargando(si, txt) {
+    $('cargandoTxt').textContent = txt || 'Buscando parejas…';
+    $('cargando').classList.toggle('oculto', !si);
+  }
+  const esperarPintado = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 30))));
+
+  /* ---------------------------------------------------------- cargar foto */
+  function leerImagen(archivo) {
+    return new Promise((ok, mal) => {
+      const url = URL.createObjectURL(archivo);
+      const img = new Image();
+      img.onload = () => { ok(img); setTimeout(() => URL.revokeObjectURL(url), 1000); };
+      img.onerror = () => { URL.revokeObjectURL(url); mal(new Error('No se puede leer la imagen')); };
+      img.src = url;
+    });
+  }
+
+  async function procesarArchivo(archivo) {
+    if (!archivo) return;
+    cargando(true, 'Leyendo la foto…');
+    await esperarPintado();
+    try {
+      const img = await leerImagen(archivo);
+      const w0 = img.naturalWidth, h0 = img.naturalHeight;
+      const s = Math.min(1, Emparejador.MAX_LADO / Math.max(w0, h0));
+      const w = Math.round(w0 * s), h = Math.round(h0 * s);
+      const c = $('lienzo');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, w, h);
+      E.base = ctx.getImageData(0, 0, w, h);
+      cargando(true, 'Buscando parejas…');
+      await esperarPintado();
+      const t0 = performance.now();
+      E.analisis = Emparejador.analizar(E.base.data, w, h);
+      E.tiempo = Math.round(performance.now() - t0);
+      if (E.analisis.calcetines.length < 2) {
+        cargando(false);
+        toast('No encuentro calcetines. Prueba con un fondo liso que contraste.');
+        return;
+      }
+      prepararAnillos();
+      emparejarDeNuevo();
+      cargando(false);
+      mostrar('resultado');
+    } catch (e) {
+      cargando(false);
+      toast('No se ha podido analizar la foto.');
+      console.error(e);
+    }
+  }
+
+  $('btnCamara').onclick = () => $('entradaCamara').click();
+  $('btnGaleria').onclick = () => $('entradaGaleria').click();
+  $('btnNueva').onclick = () => $('entradaCamara').click();
+  for (const id of ['entradaCamara', 'entradaGaleria']) {
+    $(id).addEventListener('change', (ev) => {
+      const f = ev.target.files && ev.target.files[0];
+      ev.target.value = '';
+      procesarArchivo(f);
+    });
+  }
+
+  /* ---------------------------------------------------------- dibujo */
+  function prepararAnillos() {
+    const { ancho: W, alto: H, calcetines } = E.analisis;
+    const grosor = Math.max(4, Math.round(0.007 * Math.max(W, H)));
+    E.mapa = new Int32Array(W * H);
+    E.anillos = calcetines.map((c, idx) => {
+      for (const p of c.pix) E.mapa[p] = idx + 1;
+      const mg = grosor + 4;
+      const x0 = Math.max(0, c.x0 - mg), y0 = Math.max(0, c.y0 - mg);
+      const x1 = Math.min(W - 1, c.x1 + mg), y1 = Math.min(H - 1, c.y1 + mg);
+      const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+      const m = new Uint8Array(bw * bh);
+      for (const p of c.pix) m[(((p / W) | 0) - y0) * bw + (p % W) - x0] = 1;
+      const d = Emparejador.edt(m, bw, bh, 1);
+      const color = [], negro = [];
+      const g2 = grosor * grosor, n2 = (grosor + 2.5) ** 2;
+      for (let i = 0; i < m.length; i++) {
+        if (m[i]) continue;
+        const p = ((i / bw | 0) + y0) * W + (i % bw) + x0;
+        if (d[i] <= g2) { color.push(p); if (!E.mapa[p]) E.mapa[p] = idx + 1; }
+        else if (d[i] <= n2) negro.push(p);
+      }
+      return { color: Int32Array.from(color), negro: Int32Array.from(negro) };
+    });
+  }
+
+  function emparejarDeNuevo() {
+    const n = E.analisis.calcetines.length;
+    const r = Emparejador.emparejar(E.analisis.D, E.umbral);
+    E.pareja = new Int32Array(n).fill(-1);
+    E.segura = new Uint8Array(n);
+    for (const p of r.parejas) {
+      E.pareja[p.a] = p.b; E.pareja[p.b] = p.a;
+      E.segura[p.a] = E.segura[p.b] = p.segura ? 1 : 0;
+    }
+    E.sel = -1;
+    dibujar();
+  }
+
+  function numeracion() {
+    const n = E.pareja.length, num = new Int32Array(n), lista = [];
+    let k = 0;
+    for (let i = 0; i < n; i++) {
+      const j = E.pareja[i];
+      if (j > i) { k++; num[i] = num[j] = k; lista.push([i, j]); }
+    }
+    return { num, total: k, lista };
+  }
+
+  function hexARgb(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
+
+  function dibujar() {
+    const { ancho: W, alto: H, calcetines } = E.analisis;
+    const c = $('lienzo'), ctx = c.getContext('2d');
+    const img = new ImageData(new Uint8ClampedArray(E.base.data), W, H);
+    const d = img.data;
+    const { num, total } = numeracion();
+
+    // resaltado: el seleccionado y su pareja; el resto se oscurece
+    const foco = new Set();
+    if (E.sel >= 0) { foco.add(E.sel); if (E.pareja[E.sel] >= 0) foco.add(E.pareja[E.sel]); }
+    if (foco.size) {
+      for (let p = 0, q = 0; p < W * H; p++, q += 4) {
+        const k = E.mapa[p] - 1;
+        if (k >= 0 && foco.has(k)) continue;
+        d[q] *= 0.35; d[q + 1] *= 0.35; d[q + 2] *= 0.35;
+      }
+    }
+    calcetines.forEach((cal, i) => {
+      const color = num[i] ? PALETA[(num[i] - 1) % PALETA.length] : GRIS;
+      const [r, g, b] = hexARgb(color);
+      const atenuar = foco.size && !foco.has(i) ? 0.45 : 1;
+      for (const p of E.anillos[i].negro) { const q = p * 4; d[q] = d[q + 1] = d[q + 2] = 0; }
+      for (const p of E.anillos[i].color) { const q = p * 4; d[q] = r * atenuar; d[q + 1] = g * atenuar; d[q + 2] = b * atenuar; }
+    });
+    ctx.putImageData(img, 0, 0);
+
+    // etiquetas
+    const radio = Math.max(18, Math.round(0.028 * Math.max(W, H)));
+    ctx.font = `700 ${Math.round(radio * 1.05)}px system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    calcetines.forEach((cal, i) => {
+      const [x, y] = cal.huella.etiqueta;
+      const color = num[i] ? PALETA[(num[i] - 1) % PALETA.length] : GRIS;
+      ctx.globalAlpha = foco.size && !foco.has(i) ? 0.4 : 1;
+      ctx.beginPath(); ctx.arc(x, y, radio, 0, 2 * Math.PI); ctx.fillStyle = '#000'; ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, radio - 3, 0, 2 * Math.PI); ctx.fillStyle = color; ctx.fill();
+      if (i === E.sel) { ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, radio + 4, 0, 2 * Math.PI); ctx.stroke(); }
+      ctx.fillStyle = '#000';
+      const txt = num[i] ? String(num[i]) + (E.segura[i] ? '' : '?') : '✕';
+      ctx.fillText(txt, x, y + 1);
+    });
+    ctx.globalAlpha = 1;
+
+    const huerf = calcetines.length - 2 * total;
+    $('resumen').textContent = `${total} ${total === 1 ? 'pareja' : 'parejas'} · ${huerf} sin pareja`;
+    const dudosas = numeracion().lista.filter(([a]) => !E.segura[a]).length;
+    $('subresumen').textContent = `${calcetines.length} calcetines` + (dudosas ? ` · ${dudosas} ${dudosas === 1 ? 'dudosa (?)' : 'dudosas (?)'}` : '');
+    actualizarInfo(num);
+  }
+
+  function actualizarInfo(num) {
+    const info = $('info');
+    info.classList.remove('con-boton');
+    if (E.corregir) {
+      info.classList.remove('oculto');
+      if (E.sel < 0) { info.innerHTML = 'Toca un calcetín y luego su pareja.'; return; }
+      const dot = `<span class="punto" style="background:${num[E.sel] ? PALETA[(num[E.sel] - 1) % PALETA.length] : GRIS}"></span>`;
+      if (E.pareja[E.sel] >= 0) {
+        info.innerHTML = `${dot}<span>Toca su nueva pareja</span><button id="btnSeparar">Separar</button>`;
+        info.classList.add('con-boton');
+        $('btnSeparar').onclick = (ev) => { ev.stopPropagation(); separar(E.sel); };
+      } else {
+        info.innerHTML = `${dot}<span>Ahora toca su pareja</span>`;
+      }
+      return;
+    }
+    if (E.sel < 0) { info.classList.add('oculto'); return; }
+    info.classList.remove('oculto');
+    const n = num[E.sel];
+    info.innerHTML = n
+      ? `<span class="punto" style="background:${PALETA[(n - 1) % PALETA.length]}"></span><span>Pareja ${n}${E.segura[E.sel] ? '' : ' · no estoy seguro'}</span>`
+      : `<span class="punto" style="background:${GRIS}"></span><span>Este no tiene pareja en la foto</span>`;
+  }
+
+  /* ---------------------------------------------------------- correcciones */
+  function separar(i) {
+    const j = E.pareja[i];
+    if (j >= 0) { E.pareja[j] = -1; E.segura[j] = 0; }
+    E.pareja[i] = -1; E.segura[i] = 0;
+    E.sel = -1;
+    dibujar();
+  }
+  function unir(a, b) {
+    for (const x of [a, b]) {
+      const y = E.pareja[x];
+      if (y >= 0) { E.pareja[y] = -1; E.segura[y] = 0; }
+    }
+    E.pareja[a] = b; E.pareja[b] = a;
+    E.segura[a] = E.segura[b] = 1;
+    E.sel = -1;
+    dibujar();
+  }
+
+  function tocar(ix, iy) {
+    const { ancho: W, alto: H } = E.analisis;
+    if (ix < 0 || iy < 0 || ix >= W || iy >= H) return;
+    let k = E.mapa[iy * W + ix] - 1;
+    if (k < 0) { // tolerancia: busca el calcetín más cercano en un radio pequeño
+      const r = Math.round(0.02 * Math.max(W, H));
+      let mejor = Infinity;
+      for (let dy = -r; dy <= r; dy += 2) for (let dx = -r; dx <= r; dx += 2) {
+        const x = ix + dx, y = iy + dy;
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        const q = E.mapa[y * W + x] - 1, dd = dx * dx + dy * dy;
+        if (q >= 0 && dd < mejor) { mejor = dd; k = q; }
+      }
+    }
+    if (E.corregir) {
+      if (k < 0) { E.sel = -1; dibujar(); return; }
+      if (E.sel < 0 || E.sel === k) { E.sel = E.sel === k ? -1 : k; dibujar(); return; }
+      unir(E.sel, k);
+      return;
+    }
+    E.sel = k === E.sel ? -1 : k;
+    dibujar();
+  }
+
+  $('btnCorregir').onclick = () => {
+    E.corregir = !E.corregir;
+    $('btnCorregir').classList.toggle('activo', E.corregir);
+    E.sel = -1;
+    dibujar();
+  };
+  for (const b of $('exigencia').querySelectorAll('button')) {
+    b.onclick = () => {
+      for (const o of $('exigencia').querySelectorAll('button')) o.classList.toggle('activo', o === b);
+      E.umbral = parseFloat(b.dataset.u);
+      emparejarDeNuevo();
+    };
+  }
+  $('btnVolver').onclick = () => mostrar('inicio');
+  window.onAndroidBack = () => {
+    if (!$('resultado').classList.contains('oculto')) {
+      if (E.sel >= 0) { E.sel = -1; dibujar(); } else mostrar('inicio');
+      return true;
+    }
+    return false;
+  };
+
+  /* ---------------------------------------------------------- zoom y desplazamiento */
+  const V = { base: 1, s: 1, tx: 0, ty: 0 };
+  function aplicarVista() {
+    const esc = V.base * V.s;
+    $('lienzo').style.transform = `translate(${V.tx}px, ${V.ty}px) scale(${esc})`;
+  }
+  function limitar() {
+    const caja = $('caja').getBoundingClientRect(), c = $('lienzo');
+    const esc = V.base * V.s, w = c.width * esc, h = c.height * esc;
+    V.tx = w <= caja.width ? (caja.width - w) / 2 : Math.min(0, Math.max(caja.width - w, V.tx));
+    V.ty = h <= caja.height ? (caja.height - h) / 2 : Math.min(0, Math.max(caja.height - h, V.ty));
+  }
+  function ajustarVista(reiniciar) {
+    const caja = $('caja').getBoundingClientRect(), c = $('lienzo');
+    if (!c.width || !caja.width) return;
+    V.base = Math.min(caja.width / c.width, caja.height / c.height);
+    if (reiniciar) { V.s = 1; V.tx = 0; V.ty = 0; }
+    limitar(); aplicarVista();
+  }
+  function zoomEn(px, py, nuevaS) {
+    nuevaS = Math.min(8, Math.max(1, nuevaS));
+    const k = nuevaS / V.s;
+    V.tx = px - (px - V.tx) * k; V.ty = py - (py - V.ty) * k; V.s = nuevaS;
+    limitar(); aplicarVista();
+  }
+  window.addEventListener('resize', () => ajustarVista(false));
+
+  const punteros = new Map();
+  let gesto = null, ultimoToque = 0;
+  const caja = $('caja');
+  caja.addEventListener('pointerdown', (e) => {
+    if (e.target.closest && e.target.closest('#info')) return; // botones de la barra de info
+    caja.setPointerCapture(e.pointerId);
+    const r = caja.getBoundingClientRect();
+    punteros.set(e.pointerId, { x: e.clientX - r.left, y: e.clientY - r.top });
+    if (punteros.size === 1) {
+      const p = [...punteros.values()][0];
+      gesto = { tipo: 'pan', x: p.x, y: p.y, tx: V.tx, ty: V.ty, t: Date.now(), movido: false };
+    } else if (punteros.size === 2) {
+      const [a, b] = [...punteros.values()];
+      gesto = { tipo: 'pinza', d: Math.hypot(a.x - b.x, a.y - b.y), s: V.s, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, tx: V.tx, ty: V.ty, movido: true };
+    }
+  });
+  caja.addEventListener('pointermove', (e) => {
+    if (!punteros.has(e.pointerId) || !gesto) return;
+    const r = caja.getBoundingClientRect();
+    punteros.set(e.pointerId, { x: e.clientX - r.left, y: e.clientY - r.top });
+    if (gesto.tipo === 'pan' && punteros.size === 1) {
+      const p = [...punteros.values()][0];
+      const dx = p.x - gesto.x, dy = p.y - gesto.y;
+      if (Math.hypot(dx, dy) > 8) gesto.movido = true;
+      if (gesto.movido) { V.tx = gesto.tx + dx; V.ty = gesto.ty + dy; limitar(); aplicarVista(); }
+    } else if (gesto.tipo === 'pinza' && punteros.size === 2) {
+      const [a, b] = [...punteros.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y), cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+      const nuevaS = Math.min(8, Math.max(1, gesto.s * d / gesto.d));
+      const k = nuevaS / gesto.s;
+      V.s = nuevaS;
+      V.tx = cx - (gesto.cx - gesto.tx) * k;
+      V.ty = cy - (gesto.cy - gesto.ty) * k;
+      limitar(); aplicarVista();
+    }
+  });
+  function finPuntero(e) {
+    if (!punteros.has(e.pointerId)) return;
+    const p = punteros.get(e.pointerId);
+    punteros.delete(e.pointerId);
+    if (gesto && gesto.tipo === 'pan' && !gesto.movido && punteros.size === 0 && Date.now() - gesto.t < 400) {
+      const ahora = Date.now();
+      if (ahora - ultimoToque < 300) { // doble toque: zoom
+        ultimoToque = 0;
+        zoomEn(p.x, p.y, V.s > 1.5 ? 1 : 2.5);
+      } else {
+        ultimoToque = ahora;
+        const esc = V.base * V.s;
+        tocar(Math.round((p.x - V.tx) / esc), Math.round((p.y - V.ty) / esc));
+      }
+    }
+    if (punteros.size === 1) {
+      const q = [...punteros.values()][0];
+      gesto = { tipo: 'pan', x: q.x, y: q.y, tx: V.tx, ty: V.ty, t: 0, movido: true };
+    } else if (punteros.size === 0) gesto = null;
+  }
+  caja.addEventListener('pointerup', finPuntero);
+  caja.addEventListener('pointercancel', finPuntero);
+
+  /* ---------------------------------------------------------- compartir */
+  $('btnCompartir').onclick = () => {
+    const sel = E.sel;
+    if (sel >= 0) { E.sel = -1; dibujar(); }
+    const url = $('lienzo').toDataURL('image/jpeg', 0.9);
+    if (sel >= 0) { E.sel = sel; dibujar(); }
+    if (app && app.shareImage) app.shareImage(url.split(',')[1]);
+    else { const a = document.createElement('a'); a.href = url; a.download = 'parejas-calcetines.jpg'; a.click(); }
+  };
+
+  /* ---------------------------------------------------------- actualizaciones */
+  let buscandoManual = false;
+  function buscarAct(manual) {
+    if (!app) { if (manual) $('estadoAct').textContent = 'Las actualizaciones solo funcionan en la app.'; return; }
+    buscandoManual = manual;
+    if (manual) $('estadoAct').textContent = 'Buscando…';
+    app.checkUpdate();
+  }
+  window.onUpdateInfo = (r) => {
+    if (r.error) { if (buscandoManual) $('estadoAct').textContent = r.error; return; }
+    if (r.available) {
+      $('avisoAct').classList.remove('oculto');
+      $('avisoActTxt').textContent = `Tienes la ${r.current} y está la ${r.latest}.`;
+      $('estadoAct').textContent = '';
+    } else if (buscandoManual) {
+      $('estadoAct').textContent = `Tienes la última versión (${r.current}).`;
+    }
+  };
+  window.onUpdateProgress = (pct) => { $('estadoAct').textContent = `Descargando… ${pct} %`; };
+  window.onUpdateDone = (msg) => { $('estadoAct').textContent = msg; };
+  $('btnBuscar').onclick = () => buscarAct(true);
+  $('btnInstalar').onclick = () => { $('estadoAct').textContent = 'Descargando…'; app && app.installUpdate(); };
+
+  $('version').textContent = app ? `Versión ${app.versionName()}` : 'Versión web';
+  setTimeout(() => buscarAct(false), 800);
+})();
+</script>
+</body>
+</html>
