@@ -21,6 +21,9 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 - **DINOv2** (modelo de visión) saca la huella de cada trozo del dibujo del calcetín. Para comparar dos calcetines se miran los 20 trozos más distintivos (logos, rayas, tramas) frente al resto de calcetines de la foto, así que cuenta el dibujo y no la forma con la que ha caído.
 - Dos calcetines son pareja si cada uno es el más parecido del otro y el parecido supera el umbral. Si no hay ninguno claro, se quedan sin pareja (**✕**); las parejas justas llevan **?**.
 - Si el motor de IA no puede arrancar, la app usa el motor básico anterior (colores y formas) y lo indica.
+- **Cajón de desparejados**: al pulsar **Hecho**, los calcetines que se quedan sin pareja se guardan en el móvil (miniatura y huella). En las fotos siguientes se comparan también con los del cajón y, si aparece su pareja, se marca con la etiqueta «cajón» y una tarjeta con la miniatura del guardado. Al confirmar, salen del cajón. Desde la pantalla del cajón se les puede poner nombre o borrarlos.
+- **Aprende de tus correcciones**: cada vez que pulsas **Hecho** se guardan las parejas confirmadas (con tus correcciones). A partir de 4 parejas confirmadas, la app ajusta el umbral de parecido al que mejor habría acertado con tus calcetines.
+- **Exportar datos para mejorar**: genera un JSON con las fotos guardadas, las parejas confirmadas y el cajón, para compartirlo y ajustar el motor con fotos reales.
 - **Exigencia** (Estricta / Normal / Flexible): cuánto se tienen que parecer dos calcetines para emparejarlos.
 - **Corregir**: toca un calcetín y luego su pareja; o selecciónalo y pulsa **Separar**.
 - Toca un calcetín para ver solo su pareja. Zoom con pellizco o doble toque.

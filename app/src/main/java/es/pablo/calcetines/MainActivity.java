@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.util.Base64;
+import android.util.JsonWriter;
 import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
@@ -32,12 +33,18 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.Locale;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -273,6 +280,109 @@ public class MainActivity extends Activity {
         }
     }
 
+    /* ---------------- Almacenamiento: cajón, sesiones y ajustes ---------------- */
+
+    private File dirDatos() {
+        File d = new File(getFilesDir(), "datos");
+        if (!d.exists()) d.mkdirs();
+        return d;
+    }
+
+    private static boolean claveValida(String k) {
+        return k != null && k.matches("[A-Za-z0-9_\\-]{1,80}");
+    }
+
+    private synchronized String leerDato(String clave) {
+        if (!claveValida(clave)) return null;
+        File f = new File(dirDatos(), clave);
+        if (!f.exists()) return null;
+        try (FileInputStream in = new FileInputStream(f)) {
+            return leerTodo(in);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private synchronized boolean escribirDato(String clave, String valor) {
+        if (!claveValida(clave) || valor == null) return false;
+        File dir = dirDatos();
+        File tmp = new File(dir, clave + ".tmp");
+        File destino = new File(dir, clave);
+        try (OutputStream out = new FileOutputStream(tmp)) {
+            out.write(valor.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            tmp.delete();
+            return false;
+        }
+        // Escritura atómica: si algo falla a medias, el archivo anterior sigue intacto
+        if (destino.exists() && !destino.delete()) {
+            tmp.delete();
+            return false;
+        }
+        return tmp.renameTo(destino);
+    }
+
+    private synchronized void borrarDato(String clave) {
+        if (!claveValida(clave)) return;
+        new File(dirDatos(), clave).delete();
+    }
+
+    // Junta todos los datos guardados (sesiones con sus fotos, cajón y ajustes) en un
+    // archivo JSON y abre el menú de compartir para mandarlo donde quieras.
+    private void exportarDatos() {
+        new Thread(() -> {
+            try {
+                File dir = new File(getCacheDir(), "compartir");
+                if (!dir.exists()) dir.mkdirs();
+                File[] viejos = dir.listFiles();
+                if (viejos != null) for (File v : viejos) if (v.getName().endsWith(".json")) v.delete();
+                String fecha = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+                File f = new File(dir, "calcetines-datos-" + fecha + ".json");
+                int n = 0;
+                try (OutputStream os = new FileOutputStream(f);
+                     JsonWriter w = new JsonWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8))) {
+                    w.beginObject();
+                    w.name("app").value("calcetines");
+                    w.name("formato").value(1);
+                    w.name("fecha").value(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(new Date()));
+                    w.name("version").value(nombreVersion());
+                    w.name("datos").beginObject();
+                    File[] archivos = dirDatos().listFiles();
+                    if (archivos != null) {
+                        Arrays.sort(archivos);
+                        for (File a : archivos) {
+                            String k = a.getName();
+                            if (!claveValida(k)) continue;
+                            String v = leerDato(k);
+                            if (v == null) continue;
+                            w.name(k).value(v);
+                            n++;
+                        }
+                    }
+                    w.endObject();
+                    w.endObject();
+                }
+                final int total = n;
+                Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fotos", f);
+                Intent i = new Intent(Intent.ACTION_SEND);
+                i.setType("application/json");
+                i.putExtra(Intent.EXTRA_STREAM, uri);
+                i.putExtra(Intent.EXTRA_SUBJECT, "Datos de Calcetines " + fecha);
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                runOnUiThread(() -> {
+                    try {
+                        startActivity(Intent.createChooser(i, "Exportar datos"));
+                    } catch (Exception e) {
+                        Toast.makeText(this, "No hay ninguna app para compartir", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                llamarJs("onExportDone", textoJs("Exportados " + total + " registros."));
+            } catch (Exception e) {
+                llamarJs("onExportDone", textoJs("No se ha podido exportar."));
+            }
+        }).start();
+    }
+
     /* ---------------- Versión instalada ---------------- */
 
     private long codigoVersion() {
@@ -457,6 +567,26 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void shareImage(String base64) {
             new Thread(() -> compartirImagen(base64)).start();
+        }
+
+        @JavascriptInterface
+        public String storeGet(String clave) {
+            return leerDato(clave);
+        }
+
+        @JavascriptInterface
+        public boolean storeSet(String clave, String valor) {
+            return escribirDato(clave, valor);
+        }
+
+        @JavascriptInterface
+        public void storeDelete(String clave) {
+            borrarDato(clave);
+        }
+
+        @JavascriptInterface
+        public void exportData() {
+            exportarDatos();
         }
     }
 }

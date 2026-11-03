@@ -87,6 +87,7 @@
   .chip { display: flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 12px; border: 1px solid var(--borde); font-size: .9rem; font-weight: 600; }
   .chip svg { width: 18px; height: 18px; }
   .chip.activo { background: var(--acento); border-color: var(--acento); color: var(--acento-texto); }
+  .herramientas .chip { flex: 1 1 120px; justify-content: center; }
   .etiqueta-seg { width: 100%; font-size: .78rem; color: var(--texto-2); margin: 0 0 -4px 2px; }
 
   /* ---------- cargando ---------- */
@@ -94,6 +95,50 @@
   #cargando .caja { background: var(--superficie); border-radius: 18px; padding: 22px 26px; display: flex; align-items: center; gap: 14px; }
   .rueda { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--superficie-2); border-top-color: var(--acento); animation: g 0.9s linear infinite; }
   @keyframes g { to { transform: rotate(360deg); } }
+  /* ---------- cajón ---------- */
+  #cajonVista { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--fondo); }
+  #cajonVista .contenido { flex: 1; overflow-y: auto; padding: 4px 14px calc(20px + env(safe-area-inset-bottom)); }
+  .rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+  .ficha { background: var(--superficie); border: 1px solid var(--borde); border-radius: 14px; overflow: hidden; text-align: left; padding: 0; }
+  .ficha img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: #7c7468; }
+  .ficha span { display: block; padding: 6px 8px 8px; font-size: .8rem; line-height: 1.25; color: var(--texto-2); }
+  .ficha span b { color: var(--texto); font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vacio { color: var(--texto-2); text-align: center; padding: 40px 20px; line-height: 1.45; }
+  .boton .contador { background: var(--superficie-2); color: var(--texto); border-radius: 99px; padding: 2px 9px; font-size: .85rem; }
+  .pie-links { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; color: var(--texto-2); font-size: .85rem; }
+  .pie-links button { color: var(--acento); font-weight: 600; padding: 6px 0; }
+
+  /* ---------- parejas del cajón en el resultado ---------- */
+  #chipsCajon { position: absolute; left: 0; right: 0; top: 0; display: flex; gap: 8px; overflow-x: auto; padding: 10px 12px; pointer-events: auto; }
+  #chipsCajon:empty { display: none; }
+  .chip-cajon { flex: none; display: flex; align-items: center; gap: 8px; background: rgba(20,20,20,.86); color: #fff; border-radius: 14px; padding: 5px 10px 5px 5px; font-size: .85rem; }
+  .chip-cajon img { width: 34px; height: 44px; object-fit: cover; border-radius: 8px; background: #7c7468; }
+  .chip-cajon .num { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: #000; font-weight: 700; font-size: .85rem; border: 2px solid #000; }
+  #info img { width: 34px; height: 44px; object-fit: cover; border-radius: 8px; flex: none; }
+  #info .botones-info { margin-left: auto; display: flex; gap: 6px; }
+  #info .botones-info button { margin-left: 0; }
+  .chip.principal { background: var(--acento); border-color: var(--acento); color: var(--acento-texto); }
+
+  /* ---------- ventana modal ---------- */
+  #modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: flex-end; justify-content: center; z-index: 15; }
+  #modal .hoja { background: var(--superficie); width: 100%; max-width: 560px; max-height: 85vh; border-radius: 20px 20px 0 0; display: flex; flex-direction: column;
+    padding: 18px 18px calc(16px + env(safe-area-inset-bottom)); gap: 12px; }
+  #modal h3 { margin: 0; font-size: 1.1rem; }
+  #modal .cuerpo { overflow-y: auto; color: var(--texto-2); line-height: 1.45; display: flex; flex-direction: column; gap: 10px; }
+  #modal .cuerpo b { color: var(--texto); }
+  #modal .acciones { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+  #modal .acciones button { padding: 12px 18px; border-radius: 12px; font-weight: 600; background: var(--superficie-2); }
+  #modal .acciones button.principal { background: var(--acento); color: var(--acento-texto); }
+  #modal .acciones button.peligro { color: #D32F2F; }
+  #modal input[type=text] { font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--borde); background: var(--fondo); color: var(--texto); width: 100%; }
+  #modal label.casilla { display: flex; gap: 10px; align-items: center; color: var(--texto); }
+  #modal label.casilla input { width: 22px; height: 22px; accent-color: var(--acento); }
+  .fila-cajon { display: flex; align-items: center; gap: 12px; padding: 6px; border-radius: 12px; background: var(--fondo); text-align: left; width: 100%; }
+  .fila-cajon img { width: 48px; height: 64px; object-fit: cover; border-radius: 8px; background: #7c7468; flex: none; }
+  .fila-cajon span { flex: 1; color: var(--texto-2); font-size: .9rem; }
+  .fila-cajon span b { display: block; color: var(--texto); }
+  .ficha-grande { width: 100%; max-height: 40vh; object-fit: contain; border-radius: 12px; background: #7c7468; }
+
   #toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); background: #222; color: #fff; padding: 10px 16px;
     border-radius: 12px; font-size: .9rem; z-index: 20; max-width: 90vw; text-align: center; }
 </style>
@@ -132,6 +177,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>
       Elegir de la galería
     </button>
+    <button class="boton secundario" id="btnCajon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M10 14h4"/></svg>
+      Cajón de desparejados <span class="contador" id="numCajon">0</span>
+    </button>
   </div>
   <input type="file" id="entradaCamara" accept="image/*" capture="environment" class="oculto">
   <input type="file" id="entradaGaleria" accept="image/*" class="oculto">
@@ -143,9 +192,14 @@
       <li><span class="ic">2</span><span><b>Fondo liso</b>: suelo, manta o sábana. Que se vea bien el dibujo de cada calcetín.</span></li>
       <li><span class="ic">3</span><span><b>Foto desde arriba</b>, con todos dentro y con buena luz. La primera vez tarda más porque carga los modelos.</span></li>
       <li><span class="ic">4</span><span>Si alguno sale mal, pulsa <b>Corregir</b> y toca los dos calcetines que van juntos.</span></li>
+      <li><span class="ic">5</span><span>Al acabar pulsa <b>Hecho</b>: los que se quedan solos van al <b>cajón</b> y la próxima vez se comparan con los nuevos.</span></li>
     </ul>
   </div>
 
+  <div class="pie-links">
+    <span id="aprendido"></span>
+    <button id="btnExportar">Exportar datos para mejorar</button>
+  </div>
   <div class="pie">
     <span id="version">Versión —</span>
     <button id="btnBuscar">Buscar actualizaciones</button>
@@ -169,6 +223,7 @@
   </div>
   <div id="caja">
     <canvas id="lienzo"></canvas>
+    <div id="chipsCajon"></div>
     <div id="info" class="oculto"></div>
   </div>
   <div class="herramientas">
@@ -182,8 +237,28 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>
       Corregir
     </button>
+    <button class="chip principal" id="btnHecho">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
+      Hecho
+    </button>
   </div>
 </section>
+
+<!-- =============================== CAJÓN =============================== -->
+<section id="cajonVista" class="oculto">
+  <div class="barra">
+    <button class="icono-btn" id="btnCajonVolver" aria-label="Volver">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="titulo"><b>Cajón de desparejados</b><span id="cajonSub"></span></div>
+  </div>
+  <div class="contenido">
+    <div class="rejilla" id="rejillaCajon"></div>
+    <div class="vacio oculto" id="cajonVacio">Aquí aparecerán los calcetines que se queden sin pareja cuando pulses <b>Hecho</b>.<br><br>La próxima vez que hagas una foto, la app los comparará con los nuevos y te dirá si ha aparecido su pareja.</div>
+  </div>
+</section>
+
+<div id="modal" class="oculto"><div class="hoja"><h3 id="modalTitulo"></h3><div class="cuerpo" id="modalCuerpo"></div><div class="acciones" id="modalAcciones"></div></div></div>
 
 <div id="cargando" class="oculto"><div class="caja"><div class="rueda"></div><span id="cargandoTxt">Buscando parejas…</span></div></div>
 <div id="toast" class="oculto"></div>
@@ -200,20 +275,54 @@
   const PALETA = ['#FF3B30', '#34C759', '#007AFF', '#FFCC00', '#FF2DFF', '#00E5FF', '#FF9500', '#8E5BFF',
     '#00FF9C', '#FF6FAE', '#B4FF39', '#4B6BFF', '#FFB37A', '#00B3A6', '#C8A2FF'];
   const GRIS = '#AAAAAA';
+  const UMBRAL_CLASICO = [0.45, 0.6, 0.8];
 
   const E = {
-    analisis: null,     // resultado de Emparejador.analizar
+    analisis: null,     // resultado del motor
     base: null,         // ImageData de la foto
     anillos: null,      // por calcetín: {color: Int32Array, negro: Int32Array}
     mapa: null,         // Int32Array: índice de calcetín + 1 (cuerpo o anillo)
-    pareja: null,       // Int32Array: pareja de cada calcetín o -1
-    segura: null,       // Uint8Array
+    nFoto: 0,           // calcetines de la foto; los índices >= nFoto son del cajón
+    cajon: [],          // calcetines del cajón que han entrado en la comparación (mismo orden)
+    pareja: null,       // Int32Array(nFoto): pareja de cada calcetín (foto o cajón) o -1
+    segura: null,       // Uint8Array(nFoto)
+    prediccion: [],     // parejas que propuso el motor (antes de corregir)
     nivel: 1,           // 0 estricta, 1 normal, 2 flexible
     motor: null,        // 'ia' o 'clasico'
     tiempos: null,
     corregir: false,
     sel: -1,
+    guardada: false,
   };
+
+  /* ---------------------------------------------------------- almacenamiento */
+  const memoria = new Map();
+  const Almacen = {
+    get(k) {
+      try {
+        const v = app && app.storeGet ? app.storeGet(k) : localStorage.getItem('calcetines_' + k);
+        if (v != null) return JSON.parse(v);
+      } catch (e) { /* sigue */ }
+      return memoria.has(k) ? memoria.get(k) : null;
+    },
+    set(k, v) {
+      const t = JSON.stringify(v);
+      if (app && app.storeSet) return app.storeSet(k, t);
+      try { localStorage.setItem('calcetines_' + k, t); return true; } catch (e) { memoria.set(k, v); return true; }
+    },
+    del(k) {
+      if (app && app.storeDelete) { app.storeDelete(k); return; }
+      try { localStorage.removeItem('calcetines_' + k); } catch (e) { /* nada */ }
+      memoria.delete(k);
+    },
+  };
+  const nuevoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const indiceCajon = () => Almacen.get('cajon') || [];
+  const fechaCorta = (iso) => {
+    try { return new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }); } catch (e) { return ''; }
+  };
+  const nombreCajon = (it) => (it.nombre && it.nombre.trim()) || `Guardado el ${fechaCorta(it.fecha)}`;
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   /* ---------------------------------------------------------- utilidades */
   let tToast = 0;
@@ -222,18 +331,64 @@
     t.textContent = msg;
     t.classList.remove('oculto');
     clearTimeout(tToast);
-    tToast = setTimeout(() => t.classList.add('oculto'), 2600);
+    tToast = setTimeout(() => t.classList.add('oculto'), 3000);
   }
   function mostrar(vista) {
     $('inicio').classList.toggle('oculto', vista !== 'inicio');
     $('resultado').classList.toggle('oculto', vista !== 'resultado');
+    $('cajonVista').classList.toggle('oculto', vista !== 'cajon');
     if (vista === 'resultado') ajustarVista(true);
+    if (vista === 'inicio') refrescarInicio();
+    if (vista === 'cajon') pintarCajon();
   }
   function cargando(si, txt) {
     $('cargandoTxt').textContent = txt || 'Buscando parejas…';
     $('cargando').classList.toggle('oculto', !si);
   }
   const esperarPintado = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 30))));
+
+  /* ---------------------------------------------------------- ventana modal */
+  let alCerrarModal = null;
+  function abrirModal(titulo, cuerpoHtml, acciones, alCerrar) {
+    $('modalTitulo').textContent = titulo;
+    $('modalCuerpo').innerHTML = cuerpoHtml;
+    const cont = $('modalAcciones');
+    cont.innerHTML = '';
+    for (const a of acciones) {
+      const b = document.createElement('button');
+      b.textContent = a.texto;
+      if (a.clase) b.className = a.clase;
+      b.onclick = () => { if (!a.mantener) cerrarModal(); a.accion && a.accion(); };
+      cont.appendChild(b);
+    }
+    alCerrarModal = alCerrar || null;
+    $('modal').classList.remove('oculto');
+  }
+  function cerrarModal() {
+    $('modal').classList.add('oculto');
+    const f = alCerrarModal;
+    alCerrarModal = null;
+    f && f();
+  }
+  $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) cerrarModal(); });
+
+  /* ---------------------------------------------------------- inicio */
+  function umbralBase() {
+    const aj = Almacen.get('ajustes');
+    return aj && aj.umbral != null && aj.parejas >= 4 ? aj.umbral : MotorIA.CFG.umbralBase;
+  }
+  function umbralActual() {
+    return umbralBase() + MotorIA.CFG.ajusteNivel[E.nivel];
+  }
+  function refrescarInicio() {
+    $('numCajon').textContent = indiceCajon().length;
+    const aj = Almacen.get('ajustes');
+    $('aprendido').textContent = aj && aj.parejas
+      ? (aj.parejas >= 4
+        ? `Ajustado con ${aj.parejas} parejas confirmadas.`
+        : `${aj.parejas} ${aj.parejas === 1 ? 'pareja confirmada' : 'parejas confirmadas'} (se ajusta a partir de 4).`)
+      : '';
+  }
 
   /* ---------------------------------------------------------- cargar foto */
   function leerImagen(archivo) {
@@ -246,11 +401,26 @@
     });
   }
 
-  const UMBRAL_CLASICO = [0.45, 0.6, 0.8];
+  async function cargarCajon(aviso) {
+    const items = [];
+    for (const e of indiceCajon()) {
+      const it = Almacen.get('cal_' + e.id);
+      if (it) items.push(it);
+    }
+    if (!items.length) return { items: [], huellas: [] };
+    const r = await MotorIA.prepararCajon(items, { aviso });
+    for (const it of r.actualizados) Almacen.set('cal_' + it.id, it);
+    const validos = [], huellas = [];
+    items.forEach((it, i) => { if (r.huellas[i]) { validos.push(it); huellas.push(r.huellas[i]); } });
+    return { items: validos, huellas };
+  }
 
   async function procesarArchivo(archivo) {
     if (!archivo) return;
     E.motor = null;
+    E.guardada = false;
+    E.corregir = false;
+    $('btnCorregir').classList.remove('activo');
     cargando(true, 'Leyendo la foto…');
     await esperarPintado();
     let img;
@@ -265,9 +435,13 @@
     let error = null;
     if (window.MotorIA && window.ort) {
       try {
-        const r = await MotorIA.analizar(img, { aviso: (t) => cargando(true, t) });
+        const aviso = (t) => cargando(true, t);
+        const cj = await cargarCajon(aviso);
+        const r = await MotorIA.analizar(img, { aviso, cajon: cj.huellas });
         E.motor = 'ia';
         E.analisis = r;
+        E.nFoto = r.nFoto;
+        E.cajon = cj.items;
         E.base = new ImageData(new Uint8ClampedArray(r.imagen), r.ancho, r.alto);
         E.tiempos = r.tiempos;
       } catch (e) {
@@ -276,7 +450,7 @@
       }
     }
     if (E.motor !== 'ia') {
-      // Respaldo: motor clásico (sin IA)
+      // Respaldo: motor clásico (sin IA, sin cajón)
       try {
         cargando(true, 'Buscando parejas (modo básico)…');
         await esperarPintado();
@@ -290,7 +464,10 @@
         ctx.drawImage(img, 0, 0, w, h);
         E.base = ctx.getImageData(0, 0, w, h);
         E.analisis = Emparejador.analizar(E.base.data, w, h);
+        E.analisis.ancho = w; E.analisis.alto = h;
         E.motor = 'clasico';
+        E.nFoto = E.analisis.calcetines.length;
+        E.cajon = [];
         E.tiempos = { total: Math.round(performance.now() - t0) };
         if (error) toast('Modo básico: ' + (error.message || error));
       } catch (e) {
@@ -300,9 +477,9 @@
         return;
       }
     }
-    if (E.analisis.calcetines.length < 2) {
+    if (E.nFoto < 1 || (E.nFoto < 2 && !E.cajon.length)) {
       cargando(false);
-      toast('No encuentro calcetines. Prueba con más luz y un fondo liso.');
+      toast(E.nFoto ? 'Solo veo un calcetín y el cajón está vacío.' : 'No encuentro calcetines. Prueba con más luz y un fondo liso.');
       E.motor = null;
       return;
     }
@@ -352,29 +529,42 @@
   }
 
   function emparejarDeNuevo() {
-    const n = E.analisis.calcetines.length;
-    const r = E.motor === 'ia'
-      ? MotorIA.emparejar(E.analisis.S, E.nivel)
-      : Emparejador.emparejar(E.analisis.D, UMBRAL_CLASICO[E.nivel]);
+    const n = E.nFoto;
+    let r = { parejas: [] };
+    if (E.motor === 'ia') {
+      if (E.analisis.S.length) r = MotorIA.emparejar(E.analisis.S, umbralActual(), n);
+    } else {
+      r = Emparejador.emparejar(E.analisis.D, UMBRAL_CLASICO[E.nivel]);
+    }
     E.pareja = new Int32Array(n).fill(-1);
     E.segura = new Uint8Array(n);
     for (const p of r.parejas) {
-      E.pareja[p.a] = p.b; E.pareja[p.b] = p.a;
-      E.segura[p.a] = E.segura[p.b] = p.segura ? 1 : 0;
+      E.pareja[p.a] = p.b;
+      if (p.b < n) E.pareja[p.b] = p.a;
+      E.segura[p.a] = p.segura ? 1 : 0;
+      if (p.b < n) E.segura[p.b] = E.segura[p.a];
     }
+    E.prediccion = r.parejas.map((p) => [p.a, p.b, +(p.parecido || 0).toFixed(3)]);
     E.sel = -1;
     dibujar();
   }
 
+  // Numera las parejas: num[i] = número de la pareja del calcetín i de la foto (0 = sin pareja)
   function numeracion() {
-    const n = E.pareja.length, num = new Int32Array(n), lista = [];
+    const n = E.nFoto, num = new Int32Array(n), lista = [];
     let k = 0;
     for (let i = 0; i < n; i++) {
       const j = E.pareja[i];
-      if (j > i) { k++; num[i] = num[j] = k; lista.push([i, j]); }
+      if (j > i) {
+        k++; num[i] = k; if (j < n) num[j] = k;
+        lista.push([i, j]);
+      }
     }
     return { num, total: k, lista };
   }
+  const colorDe = (n) => (n ? PALETA[(n - 1) % PALETA.length] : GRIS);
+  const delCajon = (j) => j >= E.nFoto;
+  const itemCajon = (j) => E.cajon[j - E.nFoto];
 
   function hexARgb(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
 
@@ -383,11 +573,11 @@
     const c = $('lienzo'), ctx = c.getContext('2d');
     const img = new ImageData(new Uint8ClampedArray(E.base.data), W, H);
     const d = img.data;
-    const { num, total } = numeracion();
+    const { num, total, lista } = numeracion();
 
     // resaltado: el seleccionado y su pareja; el resto se oscurece
     const foco = new Set();
-    if (E.sel >= 0) { foco.add(E.sel); if (E.pareja[E.sel] >= 0) foco.add(E.pareja[E.sel]); }
+    if (E.sel >= 0) { foco.add(E.sel); if (E.pareja[E.sel] >= 0 && !delCajon(E.pareja[E.sel])) foco.add(E.pareja[E.sel]); }
     if (foco.size) {
       for (let p = 0, q = 0; p < W * H; p++, q += 4) {
         const k = E.mapa[p] - 1;
@@ -396,36 +586,59 @@
       }
     }
     calcetines.forEach((cal, i) => {
-      const color = num[i] ? PALETA[(num[i] - 1) % PALETA.length] : GRIS;
-      const [r, g, b] = hexARgb(color);
+      const [r, g, b] = hexARgb(colorDe(num[i]));
       const atenuar = foco.size && !foco.has(i) ? 0.45 : 1;
       for (const p of E.anillos[i].negro) { const q = p * 4; d[q] = d[q + 1] = d[q + 2] = 0; }
       for (const p of E.anillos[i].color) { const q = p * 4; d[q] = r * atenuar; d[q + 1] = g * atenuar; d[q + 2] = b * atenuar; }
     });
     ctx.putImageData(img, 0, 0);
 
-    // etiquetas
+    // etiquetas (las parejas del cajón llevan debajo la palabra «cajón»)
     const radio = Math.max(18, Math.round(0.028 * Math.max(W, H)));
-    ctx.font = `700 ${Math.round(radio * 1.05)}px system-ui, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     calcetines.forEach((cal, i) => {
       const [x, y] = cal.huella.etiqueta;
-      const color = num[i] ? PALETA[(num[i] - 1) % PALETA.length] : GRIS;
       ctx.globalAlpha = foco.size && !foco.has(i) ? 0.4 : 1;
       ctx.beginPath(); ctx.arc(x, y, radio, 0, 2 * Math.PI); ctx.fillStyle = '#000'; ctx.fill();
-      ctx.beginPath(); ctx.arc(x, y, radio - 3, 0, 2 * Math.PI); ctx.fillStyle = color; ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, radio - 3, 0, 2 * Math.PI); ctx.fillStyle = colorDe(num[i]); ctx.fill();
       if (i === E.sel) { ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, radio + 4, 0, 2 * Math.PI); ctx.stroke(); }
       ctx.fillStyle = '#000';
+      ctx.font = `700 ${Math.round(radio * 1.05)}px system-ui, sans-serif`;
       const txt = num[i] ? String(num[i]) + (E.segura[i] ? '' : '?') : '✕';
       ctx.fillText(txt, x, y + 1);
+      if (num[i] && delCajon(E.pareja[i])) {
+        ctx.font = `700 ${Math.round(radio * 0.62)}px system-ui, sans-serif`;
+        const tw = ctx.measureText('cajón').width + radio * 0.5, th = radio * 0.85, yy = y + radio + th * 0.65;
+        ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.roundRect(x - tw / 2 - 3, yy - th / 2 - 3, tw + 6, th + 6, th / 2 + 3); ctx.fill();
+        ctx.fillStyle = colorDe(num[i]);
+        ctx.beginPath(); ctx.roundRect(x - tw / 2, yy - th / 2, tw, th, th / 2); ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.fillText('cajón', x, yy + 1);
+      }
     });
     ctx.globalAlpha = 1;
 
-    const huerf = calcetines.length - 2 * total;
+    // chips con los calcetines del cajón que han encontrado pareja
+    const chips = $('chipsCajon');
+    chips.innerHTML = '';
+    for (const [i, j] of lista) {
+      if (!delCajon(j)) continue;
+      const it = itemCajon(j);
+      const b = document.createElement('button');
+      b.className = 'chip-cajon';
+      b.innerHTML = `<span class="num" style="background:${colorDe(num[i])}">${num[i]}</span><img src="${it.miniatura}" alt=""><span>Del cajón · ${esc(nombreCajon(it))}</span>`;
+      b.onclick = (ev) => { ev.stopPropagation(); E.sel = i; dibujar(); };
+      chips.appendChild(b);
+    }
+
+    const huerf = E.nFoto - lista.reduce((s, [, j]) => s + (delCajon(j) ? 1 : 2), 0);
+    const conCajon = lista.filter(([, j]) => delCajon(j)).length;
     $('resumen').textContent = `${total} ${total === 1 ? 'pareja' : 'parejas'} · ${huerf} sin pareja`;
-    const dudosas = numeracion().lista.filter(([a]) => !E.segura[a]).length;
+    const dudosas = lista.filter(([a]) => !E.segura[a]).length;
     const seg = E.tiempos ? ` · ${(E.tiempos.total / 1000).toFixed(1)} s` : '';
-    $('subresumen').textContent = `${calcetines.length} calcetines` + (dudosas ? ` · ${dudosas} ${dudosas === 1 ? 'dudosa (?)' : 'dudosas (?)'}` : '') +
+    $('subresumen').textContent = `${E.nFoto} calcetines` + (conCajon ? ` · ${conCajon} con el cajón` : '') +
+      (dudosas ? ` · ${dudosas} ${dudosas === 1 ? 'dudosa (?)' : 'dudosas (?)'}` : '') +
       seg + (E.motor === 'clasico' ? ' · modo básico' : '');
     actualizarInfo(num);
   }
@@ -433,44 +646,69 @@
   function actualizarInfo(num) {
     const info = $('info');
     info.classList.remove('con-boton');
+    const i = E.sel;
     if (E.corregir) {
       info.classList.remove('oculto');
-      if (E.sel < 0) { info.innerHTML = 'Toca un calcetín y luego su pareja.'; return; }
-      const dot = `<span class="punto" style="background:${num[E.sel] ? PALETA[(num[E.sel] - 1) % PALETA.length] : GRIS}"></span>`;
-      if (E.pareja[E.sel] >= 0) {
-        info.innerHTML = `${dot}<span>Toca su nueva pareja</span><button id="btnSeparar">Separar</button>`;
-        info.classList.add('con-boton');
-        $('btnSeparar').onclick = (ev) => { ev.stopPropagation(); separar(E.sel); };
-      } else {
-        info.innerHTML = `${dot}<span>Ahora toca su pareja</span>`;
-      }
+      if (i < 0) { info.innerHTML = 'Toca un calcetín y luego su pareja.'; return; }
+      const dot = `<span class="punto" style="background:${colorDe(num[i])}"></span>`;
+      const botones = [];
+      if (E.pareja[i] >= 0) botones.push('<button id="btnSeparar">Separar</button>');
+      if (E.motor === 'ia' && E.cajon.length) botones.push('<button id="btnDelCajon">Del cajón</button>');
+      info.innerHTML = `${dot}<span>${E.pareja[i] >= 0 ? 'Toca su nueva pareja' : 'Ahora toca su pareja'}</span><span class="botones-info">${botones.join('')}</span>`;
+      if (botones.length) info.classList.add('con-boton');
+      if ($('btnSeparar')) $('btnSeparar').onclick = (ev) => { ev.stopPropagation(); separar(i); };
+      if ($('btnDelCajon')) $('btnDelCajon').onclick = (ev) => { ev.stopPropagation(); elegirDelCajon(i); };
       return;
     }
-    if (E.sel < 0) { info.classList.add('oculto'); return; }
+    if (i < 0) { info.classList.add('oculto'); return; }
     info.classList.remove('oculto');
-    const n = num[E.sel];
-    info.innerHTML = n
-      ? `<span class="punto" style="background:${PALETA[(n - 1) % PALETA.length]}"></span><span>Pareja ${n}${E.segura[E.sel] ? '' : ' · no estoy seguro'}</span>`
-      : `<span class="punto" style="background:${GRIS}"></span><span>Este no tiene pareja en la foto</span>`;
+    const n = num[i], j = E.pareja[i];
+    if (n && delCajon(j)) {
+      const it = itemCajon(j);
+      info.innerHTML = `<span class="punto" style="background:${colorDe(n)}"></span><img src="${it.miniatura}" alt=""><span>Su pareja está en el cajón: <b>${esc(nombreCajon(it))}</b>${E.segura[i] ? '' : ' · no estoy seguro'}</span>`;
+    } else if (n) {
+      info.innerHTML = `<span class="punto" style="background:${colorDe(n)}"></span><span>Pareja ${n}${E.segura[i] ? '' : ' · no estoy seguro'}</span>`;
+    } else {
+      info.innerHTML = `<span class="punto" style="background:${GRIS}"></span><span>Sin pareja en la foto${E.cajon.length ? ' ni en el cajón' : ''}</span>`;
+    }
   }
 
   /* ---------------------------------------------------------- correcciones */
+  function soltar(x) {
+    // deshace la pareja actual del calcetín x de la foto
+    const y = E.pareja[x];
+    if (y >= 0 && !delCajon(y)) { E.pareja[y] = -1; E.segura[y] = 0; }
+    E.pareja[x] = -1; E.segura[x] = 0;
+  }
   function separar(i) {
-    const j = E.pareja[i];
-    if (j >= 0) { E.pareja[j] = -1; E.segura[j] = 0; }
-    E.pareja[i] = -1; E.segura[i] = 0;
+    soltar(i);
     E.sel = -1;
     dibujar();
   }
   function unir(a, b) {
-    for (const x of [a, b]) {
-      const y = E.pareja[x];
-      if (y >= 0) { E.pareja[y] = -1; E.segura[y] = 0; }
+    soltar(a);
+    if (delCajon(b)) {
+      // un calcetín del cajón solo puede tener una pareja
+      for (let x = 0; x < E.nFoto; x++) if (E.pareja[x] === b) soltar(x);
+    } else {
+      soltar(b);
+      E.pareja[b] = a; E.segura[b] = 1;
     }
-    E.pareja[a] = b; E.pareja[b] = a;
-    E.segura[a] = E.segura[b] = 1;
+    E.pareja[a] = b; E.segura[a] = 1;
     E.sel = -1;
     dibujar();
+  }
+
+  function elegirDelCajon(i) {
+    const S = E.analisis.S;
+    const orden = E.cajon.map((it, k) => ({ it, j: E.nFoto + k, s: S.length ? S[i][E.nFoto + k] : 0 }))
+      .sort((p, q) => q.s - p.s);
+    const filas = orden.map((o, k) =>
+      `<button class="fila-cajon" data-j="${o.j}"><img src="${o.it.miniatura}" alt=""><span><b>${esc(nombreCajon(o.it))}</b>${k === 0 ? 'El más parecido' : ''}</span></button>`).join('');
+    abrirModal('¿Cuál es su pareja?', `<div style="display:flex;flex-direction:column;gap:8px">${filas}</div>`, [{ texto: 'Cancelar' }]);
+    for (const b of $('modalCuerpo').querySelectorAll('.fila-cajon')) {
+      b.onclick = () => { cerrarModal(); unir(i, parseInt(b.dataset.j, 10)); };
+    }
   }
 
   function tocar(ix, iy) {
@@ -512,12 +750,229 @@
   }
   $('btnVolver').onclick = () => mostrar('inicio');
   window.onAndroidBack = () => {
+    if (!$('modal').classList.contains('oculto')) { cerrarModal(); return true; }
+    if (!$('cajonVista').classList.contains('oculto')) { mostrar('inicio'); return true; }
     if (!$('resultado').classList.contains('oculto')) {
       if (E.sel >= 0) { E.sel = -1; dibujar(); } else mostrar('inicio');
       return true;
     }
     return false;
   };
+
+  /* ---------------------------------------------------------- Hecho: guardar sesión y cajón */
+  function fotoReducida(lado, calidad) {
+    const { ancho: W, alto: H } = E.analisis;
+    const s = Math.min(1, lado / Math.max(W, H));
+    const c0 = document.createElement('canvas');
+    c0.width = W; c0.height = H;
+    c0.getContext('2d').putImageData(E.base, 0, 0);
+    const c = document.createElement('canvas');
+    c.width = Math.round(W * s); c.height = Math.round(H * s);
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(c0, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', calidad);
+  }
+
+  function resumenFinal() {
+    const { lista } = numeracion();
+    const foto = lista.filter(([, j]) => !delCajon(j));
+    const cajon = lista.filter(([, j]) => delCajon(j));
+    const solos = [];
+    for (let i = 0; i < E.nFoto; i++) if (E.pareja[i] < 0) solos.push(i);
+    return { lista, foto, cajon, solos };
+  }
+
+  $('btnHecho').onclick = () => {
+    if (E.guardada) { toast('Esta foto ya está guardada.'); return; }
+    const r = resumenFinal();
+    const puedeCajon = E.motor === 'ia';
+    const lineas = [
+      `<div>• <b>${r.foto.length}</b> ${r.foto.length === 1 ? 'pareja' : 'parejas'} en la foto</div>`,
+      r.cajon.length ? `<div>• <b>${r.cajon.length}</b> con calcetines del cajón (saldrán del cajón)</div>` : '',
+      `<div>• <b>${r.solos.length}</b> sin pareja</div>`,
+      r.solos.length && puedeCajon ? '<label class="casilla"><input type="checkbox" id="chkCajon" checked> Guardar los que no tienen pareja en el cajón</label>' : '',
+      !puedeCajon ? '<div>En modo básico no se puede usar el cajón.</div>' : '',
+      '<div style="font-size:.85rem">Las parejas que confirmas sirven para que la app se ajuste a tus calcetines.</div>',
+    ].join('');
+    abrirModal('Guardar resultado', lineas, [
+      { texto: 'Cancelar' },
+      { texto: 'Guardar', clase: 'principal', accion: () => {}, mantener: true },
+    ]);
+    const btnGuardar = $('modalAcciones').lastChild;
+    btnGuardar.onclick = async () => {
+      const alCajon = puedeCajon && r.solos.length && $('chkCajon') && $('chkCajon').checked;
+      cerrarModal();
+      cargando(true, 'Guardando…');
+      await esperarPintado();
+      try {
+        const n = guardarSesion(r, alCajon);
+        E.guardada = true;
+        aprender();
+        cargando(false);
+        toast(alCajon && n ? `Guardado. ${n} ${n === 1 ? 'calcetín va' : 'calcetines van'} al cajón.` : 'Guardado.');
+        mostrar('inicio');
+      } catch (e) {
+        cargando(false);
+        console.error(e);
+        toast('No se ha podido guardar: ' + (e.message || e));
+      }
+    };
+  };
+
+  function guardarSesion(r, alCajon) {
+    const id = nuevoId(), fecha = new Date().toISOString();
+    const { ancho: W, alto: H, calcetines } = E.analisis;
+    const redondear = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null);
+    const S = E.motor === 'ia' && E.analisis.S.length ? E.analisis.S.map((f) => Array.from(f, redondear)) : null;
+    const final = r.lista.map(([a, b]) => [a, b]);
+
+    // 1. calcetines del cajón que han encontrado pareja: salen del cajón
+    let indice = indiceCajon();
+    const usados = new Set(r.cajon.map(([, j]) => itemCajon(j).id));
+    for (const cid of usados) Almacen.del('cal_' + cid);
+    indice = indice.filter((e) => !usados.has(e.id));
+
+    // 2. los que se quedan solos entran en el cajón
+    const nuevos = [];
+    if (alCajon) {
+      for (const i of r.solos) {
+        const cid = nuevoId();
+        const it = {
+          id: cid, fecha, nombre: '', sesion: id,
+          miniatura: calcetines[i].miniatura,
+          huella: MotorIA.huellaAGuardar(E.analisis.huellas[i]),
+          recorte: MotorIA.recorteAGuardar(E.analisis.recortes[i]),
+        };
+        if (!Almacen.set('cal_' + cid, it)) throw new Error('sin espacio');
+        indice.push({ id: cid, fecha, nombre: '', miniatura: it.miniatura });
+        nuevos.push({ i, id: cid });
+      }
+    }
+    Almacen.set('cajon', indice);
+
+    // 3. la sesión (para exportar) y los datos para aprender
+    const ses = {
+      id, fecha, version: app && app.versionName ? app.versionName() : 'web', motor: E.motor,
+      nivel: E.nivel, umbral: E.motor === 'ia' ? +umbralActual().toFixed(3) : UMBRAL_CLASICO[E.nivel],
+      nFoto: E.nFoto, cajonIds: E.cajon.map((it) => it.id),
+      calcetines: calcetines.map((c) => ({
+        centro: [+(c.huella.etiqueta[0] / W).toFixed(4), +(c.huella.etiqueta[1] / H).toFixed(4)],
+        caja: [+(c.x0 / W).toFixed(4), +(c.y0 / H).toFixed(4), +(c.x1 / W).toFixed(4), +(c.y1 / H).toFixed(4)],
+      })),
+      prediccion: E.prediccion, final, alCajon: nuevos, tiempos: E.tiempos,
+      S, foto: fotoReducida(1600, 0.82),
+    };
+    Almacen.set('ses_' + id, ses);
+    if (S) Almacen.set('apr_' + id, { S, nFoto: E.nFoto, final });
+    const sesiones = Almacen.get('sesiones') || [];
+    sesiones.push({ id, fecha, parejas: r.foto.length, cajon: r.cajon.length, alCajon: nuevos.length });
+    Almacen.set('sesiones', sesiones);
+    return nuevos.length;
+  }
+
+  /* ---------------------------------------------------------- aprender de tus parejas confirmadas */
+  // Busca el umbral con el que el motor habría acertado más parejas de las que has confirmado
+  function aprender() {
+    const sesiones = (Almacen.get('sesiones') || []).slice(-40);
+    const datos = [];
+    let confirmadas = 0;
+    for (const s of sesiones) {
+      const a = Almacen.get('apr_' + s.id);
+      if (!a || !a.S) continue;
+      const S = a.S.map((f) => f.map((v) => (v == null ? -Infinity : v)));
+      const clave = (x, y) => (x < y ? x + '-' + y : y + '-' + x);
+      datos.push({ S, nFoto: a.nFoto, final: new Set(a.final.map(([x, y]) => clave(x, y))), clave });
+      confirmadas += a.final.length;
+    }
+    let mejorT = MotorIA.CFG.umbralBase, mejorErr = Infinity;
+    for (let T = 0.15; T <= 0.40001; T += 0.005) {
+      let err = 0;
+      for (const d of datos) {
+        const pred = MotorIA.emparejar(d.S, T, d.nFoto).parejas.map((p) => d.clave(p.a, p.b));
+        const ps = new Set(pred);
+        for (const k of pred) if (!d.final.has(k)) err++;      // pareja que no era
+        for (const k of d.final) if (!ps.has(k)) err++;        // pareja que no vio
+      }
+      const dist = Math.abs(T - MotorIA.CFG.umbralBase), distMejor = Math.abs(mejorT - MotorIA.CFG.umbralBase);
+      if (err < mejorErr || (err === mejorErr && dist < distMejor)) { mejorErr = err; mejorT = T; }
+    }
+    Almacen.set('ajustes', { umbral: +mejorT.toFixed(3), parejas: confirmadas, sesiones: datos.length, errores: mejorErr });
+  }
+
+  /* ---------------------------------------------------------- pantalla del cajón */
+  $('btnCajon').onclick = () => mostrar('cajon');
+  $('btnCajonVolver').onclick = () => mostrar('inicio');
+
+  function pintarCajon() {
+    const indice = indiceCajon().slice().reverse();
+    $('cajonSub').textContent = indice.length ? `${indice.length} ${indice.length === 1 ? 'calcetín' : 'calcetines'} esperando pareja` : '';
+    $('cajonVacio').classList.toggle('oculto', indice.length > 0);
+    const rej = $('rejillaCajon');
+    rej.innerHTML = '';
+    for (const e of indice) {
+      const b = document.createElement('button');
+      b.className = 'ficha';
+      b.innerHTML = `<img src="${e.miniatura}" alt=""><span><b>${esc(e.nombre || 'Sin nombre')}</b>${fechaCorta(e.fecha)}</span>`;
+      b.onclick = () => editarCajon(e.id);
+      rej.appendChild(b);
+    }
+  }
+
+  function renombrarCajon(id, nombre) {
+    const ind = indiceCajon();
+    const x = ind.find((y) => y.id === id);
+    if (x) x.nombre = nombre;
+    Almacen.set('cajon', ind);
+    const it = Almacen.get('cal_' + id);
+    if (it) { it.nombre = nombre; Almacen.set('cal_' + id, it); }
+  }
+
+  function borrarDelCajon(id) {
+    Almacen.del('cal_' + id);
+    Almacen.set('cajon', indiceCajon().filter((x) => x.id !== id));
+  }
+
+  function editarCajon(id) {
+    const e = indiceCajon().find((x) => x.id === id);
+    if (!e) return;
+    abrirModal('Calcetín del cajón',
+      `<img class="ficha-grande" src="${e.miniatura}" alt=""><div>Guardado el ${fechaCorta(e.fecha)}.</div>
+       <input type="text" id="nombreCajon" maxlength="40" placeholder="Nombre (p. ej. Deadpool, del niño…)" value="${esc(e.nombre || '')}">`,
+      [
+        { texto: 'Borrar', clase: 'peligro', accion: () => {
+          abrirModal('¿Borrar este calcetín?', 'Sale del cajón y ya no se comparará con los nuevos.', [
+            { texto: 'Cancelar' },
+            { texto: 'Borrar', clase: 'principal', accion: () => { borrarDelCajon(id); pintarCajon(); toast('Borrado del cajón.'); } },
+          ]);
+        } },
+        { texto: 'Guardar', clase: 'principal', mantener: true },
+      ]);
+    // Guardar lee el nombre antes de cerrar la ventana
+    $('modalAcciones').lastChild.onclick = () => {
+      const nombre = $('nombreCajon').value.trim();
+      cerrarModal();
+      renombrarCajon(id, nombre);
+      pintarCajon();
+    };
+  }
+
+  /* ---------------------------------------------------------- exportar datos */
+  $('btnExportar').onclick = () => {
+    const n = (Almacen.get('sesiones') || []).length;
+    if (!n && !indiceCajon().length) { toast('Todavía no hay nada guardado. Pulsa Hecho después de analizar una foto.'); return; }
+    if (app && app.exportData) { app.exportData(); return; }
+    // navegador: descarga un JSON con lo guardado
+    const datos = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k.startsWith('calcetines_')) datos[k.slice(11)] = localStorage.getItem(k);
+    }
+    const blob = new Blob([JSON.stringify({ app: 'calcetines', formato: 1, fecha: new Date().toISOString(), datos })], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'calcetines-datos.json'; a.click();
+  };
+  window.onExportDone = (msg) => toast(msg);
 
   /* ---------------------------------------------------------- zoom y desplazamiento */
   const V = { base: 1, s: 1, tx: 0, ty: 0 };
@@ -550,7 +1005,7 @@
   let gesto = null, ultimoToque = 0;
   const caja = $('caja');
   caja.addEventListener('pointerdown', (e) => {
-    if (e.target.closest && e.target.closest('#info')) return; // botones de la barra de info
+    if (e.target.closest && e.target.closest('#info, #chipsCajon')) return; // botones sobre la foto
     caja.setPointerCapture(e.pointerId);
     const r = caja.getBoundingClientRect();
     punteros.set(e.pointerId, { x: e.clientX - r.left, y: e.clientY - r.top });
@@ -639,6 +1094,7 @@
   $('btnInstalar').onclick = () => { $('estadoAct').textContent = 'Descargando…'; app && app.installUpdate(); };
 
   $('version').textContent = app ? `Versión ${app.versionName()}` : 'Versión web';
+  refrescarInicio();
   setTimeout(() => buscarAct(false), 800);
 })();
 </script>
