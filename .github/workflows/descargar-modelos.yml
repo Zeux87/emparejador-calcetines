@@ -1,0 +1,36 @@
+name: Descargar modelos
+
+on:
+  push:
+    branches:
+      - modelos
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  modelos:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar modelos ONNX
+        run: |
+          set -e
+          mkdir m && cd m
+          base=https://huggingface.co
+          get() { curl -fsSL -o "$2" "$base/$1" && ls -l "$2"; }
+          get Xenova/dinov2-small/resolve/main/onnx/model_quantized.onnx dinov2-small-q.onnx
+          get Xenova/dinov2-small/resolve/main/onnx/model.onnx dinov2-small.onnx
+          get Xenova/dinov2-small/resolve/main/preprocessor_config.json dinov2-preproc.json
+          get Xenova/slimsam-77-uniform/resolve/main/onnx/vision_encoder_quantized.onnx slimsam-encoder-q.onnx
+          get Xenova/slimsam-77-uniform/resolve/main/onnx/prompt_encoder_mask_decoder_quantized.onnx slimsam-decoder-q.onnx
+          get Xenova/slimsam-77-uniform/resolve/main/onnx/vision_encoder.onnx slimsam-encoder.onnx
+          get Xenova/slimsam-77-uniform/resolve/main/onnx/prompt_encoder_mask_decoder.onnx slimsam-decoder.onnx
+          get Xenova/slimsam-77-uniform/resolve/main/preprocessor_config.json slimsam-preproc.json
+      - name: Publicar como versión de modelos (no afecta a la app)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete modelos-v1 -R "$GITHUB_REPOSITORY" -y --cleanup-tag || true
+          gh release create modelos-v1 m/* -R "$GITHUB_REPOSITORY" --prerelease --target modelos \
+            --title "Modelos (uso interno)" --notes "Modelos ONNX para el motor de la app. No es una versión de la app."
