@@ -505,7 +505,7 @@
   /* ---------------------------------------------------------- dibujo */
   function prepararAnillos() {
     const { ancho: W, alto: H, calcetines } = E.analisis;
-    const grosor = Math.max(4, Math.round(0.007 * Math.max(W, H)));
+    const grosor = Math.max(3, Math.round(0.005 * Math.max(W, H)));
     E.mapa = new Int32Array(W * H);
     E.anillos = calcetines.map((c, idx) => {
       for (const p of c.pix) E.mapa[p] = idx + 1;
@@ -593,24 +593,32 @@
     });
     ctx.putImageData(img, 0, 0);
 
-    // etiquetas (las parejas del cajón llevan debajo la palabra «cajón»)
-    const radio = Math.max(18, Math.round(0.028 * Math.max(W, H)));
+    // etiquetas pequeñas, ajustadas al grosor de cada calcetín (los sin pareja, aún más pequeñas);
+    // las parejas del cajón llevan debajo la palabra «cajón»
+    const lado = Math.max(W, H);
+    const rMax = 0.016 * lado, rMin = 0.0085 * lado;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     calcetines.forEach((cal, i) => {
       const [x, y] = cal.huella.etiqueta;
+      const g = cal.huella.grosor || rMax;
+      let radio = Math.max(rMin, Math.min(rMax, 0.7 * g));
+      if (!num[i] && i !== E.sel) radio *= 0.8;
+      radio = Math.round(radio);
       ctx.globalAlpha = foco.size && !foco.has(i) ? 0.4 : 1;
+      const borde = Math.max(2, Math.round(radio * 0.12));
       ctx.beginPath(); ctx.arc(x, y, radio, 0, 2 * Math.PI); ctx.fillStyle = '#000'; ctx.fill();
-      ctx.beginPath(); ctx.arc(x, y, radio - 3, 0, 2 * Math.PI); ctx.fillStyle = colorDe(num[i]); ctx.fill();
-      if (i === E.sel) { ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, radio + 4, 0, 2 * Math.PI); ctx.stroke(); }
+      ctx.beginPath(); ctx.arc(x, y, radio - borde, 0, 2 * Math.PI); ctx.fillStyle = colorDe(num[i]); ctx.fill();
+      if (i === E.sel) { ctx.lineWidth = borde + 1; ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, radio + borde + 1, 0, 2 * Math.PI); ctx.stroke(); }
       ctx.fillStyle = '#000';
-      ctx.font = `700 ${Math.round(radio * 1.05)}px system-ui, sans-serif`;
+      const txtLargo = num[i] && !E.segura[i] && num[i] >= 10;
+      ctx.font = `700 ${Math.round(radio * (txtLargo ? 0.85 : 1.05))}px system-ui, sans-serif`;
       const txt = num[i] ? String(num[i]) + (E.segura[i] ? '' : '?') : '✕';
       ctx.fillText(txt, x, y + 1);
       if (num[i] && delCajon(E.pareja[i])) {
         ctx.font = `700 ${Math.round(radio * 0.62)}px system-ui, sans-serif`;
         const tw = ctx.measureText('cajón').width + radio * 0.5, th = radio * 0.85, yy = y + radio + th * 0.65;
         ctx.fillStyle = '#000';
-        ctx.beginPath(); ctx.roundRect(x - tw / 2 - 3, yy - th / 2 - 3, tw + 6, th + 6, th / 2 + 3); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(x - tw / 2 - borde, yy - th / 2 - borde, tw + 2 * borde, th + 2 * borde, th / 2 + borde); ctx.fill();
         ctx.fillStyle = colorDe(num[i]);
         ctx.beginPath(); ctx.roundRect(x - tw / 2, yy - th / 2, tw, th, th / 2); ctx.fill();
         ctx.fillStyle = '#000';

@@ -696,7 +696,7 @@
     for (let i = 0; i < d.length; i++) {
       if (m[i] && d[i] > mejor) { mejor = d[i]; pos = [(i % bw) + cal.x0 - 1, ((i / bw) | 0) + cal.y0 - 1]; }
     }
-    return pos;
+    return { pos, r: Math.sqrt(Math.max(0, mejor)) }; // r = medio grosor del calcetín en ese punto
   }
 
   /**
@@ -727,7 +727,7 @@
       recortes.push(recortePlegado(I2, cal, m, sam.hh, sam.ww));
       calcetines.push({
         pix: cal.pix, x0: cal.x0, y0: cal.y0, x1: cal.x1, y1: cal.y1,
-        huella: { etiqueta: puntoInterior(cal, I2.w) },
+        huella: (() => { const pi = puntoInterior(cal, I2.w); return { etiqueta: pi.pos, grosor: pi.r }; })(),
         miniatura: miniatura(I2.lienzo, cal, I2.w, 220),
       });
     }
