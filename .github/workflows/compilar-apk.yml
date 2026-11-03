@@ -27,6 +27,35 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Descargar los modelos de IA
+        run: |
+          set -e
+          d=app/src/main/assets/modelos
+          mkdir -p "$d"
+          base=https://huggingface.co
+          curl -fsSL -o "$d/slimsam-encoder-q.onnx" "$base/Xenova/slimsam-77-uniform/resolve/main/onnx/vision_encoder_quantized.onnx"
+          curl -fsSL -o "$d/slimsam-decoder-q.onnx" "$base/Xenova/slimsam-77-uniform/resolve/main/onnx/prompt_encoder_mask_decoder_quantized.onnx"
+          curl -fsSL -o "$d/dinov2-small-q.onnx" "$base/Xenova/dinov2-small/resolve/main/onnx/model_quantized.onnx"
+          # Comprueba que son exactamente los modelos con los que se ha probado la app
+          cat > modelos.sha256 <<'SUMAS'
+          cce23c7b2e5d4f330932738fb67ba518e04b0d99ccdd1cccd22a7da4e01f2971  app/src/main/assets/modelos/slimsam-encoder-q.onnx
+          cb90b279f549d2cab7fd6e20c38522438c65d84bdcca3d2a764cff7d857fdce2  app/src/main/assets/modelos/slimsam-decoder-q.onnx
+          3afdc8bc63b50558d6e5770f5b799bb82455c2311183a2de43803f343a29d917  app/src/main/assets/modelos/dinov2-small-q.onnx
+          SUMAS
+          sed -i 's/^ *//' modelos.sha256
+          sha256sum -c modelos.sha256
+
+      - name: Copiar onnxruntime-web
+        run: |
+          set -e
+          npm install --no-save --prefix /tmp/ort onnxruntime-web@1.31.1
+          d=app/src/main/assets/ort
+          mkdir -p "$d"
+          cp /tmp/ort/node_modules/onnxruntime-web/dist/ort.wasm.min.js \
+             /tmp/ort/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs \
+             /tmp/ort/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm "$d/"
+          ls -la "$d" app/src/main/assets/modelos
+
       - name: Compilar el APK
         env:
           BUILD_NUMBER: ${{ github.run_number }}

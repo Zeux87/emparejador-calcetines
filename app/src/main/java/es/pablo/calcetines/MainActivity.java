@@ -18,12 +18,14 @@ import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
+import androidx.webkit.WebViewAssetLoader;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -36,6 +38,8 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 
 public class MainActivity extends Activity {
 
@@ -45,6 +49,12 @@ public class MainActivity extends Activity {
     private static final int REQ_CAMARA = 10;
     private static final int REQ_GALERIA = 11;
     private static final int REQ_PERMISO_CAMARA = 21;
+
+    // La app se sirve desde un dominio https propio para que el motor de IA pueda usar
+    // varios hilos (necesita "aislamiento de origen": cabeceras COOP/COEP).
+    private static final String DOMINIO = "appassets.androidplatform.net";
+    private static final String INICIO = "https://" + DOMINIO + "/assets/index.html";
+    private WebViewAssetLoader cargador;
 
     private WebView web;
     private ValueCallback<Uri[]> callback;
@@ -63,15 +73,40 @@ public class MainActivity extends Activity {
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
-        s.setAllowFileAccess(true);
+        s.setAllowFileAccess(false);
+        s.setAllowContentAccess(false);
 
         web.addJavascriptInterface(new Puente(), "AndroidApp");
 
+        cargador = new WebViewAssetLoader.Builder()
+                .setDomain(DOMINIO)
+                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .build();
+
         web.setWebViewClient(new WebViewClient() {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
+                Uri u = r.getUrl();
+                WebResourceResponse resp = cargador.shouldInterceptRequest(u);
+                if (resp == null) return null;
+                String ruta = u.getPath() == null ? "" : u.getPath();
+                if (ruta.endsWith(".wasm")) resp.setMimeType("application/wasm");
+                else if (ruta.endsWith(".mjs") || ruta.endsWith(".js")) resp.setMimeType("text/javascript");
+                else if (ruta.endsWith(".onnx")) resp.setMimeType("application/octet-stream");
+                Map<String, String> cab = new HashMap<>();
+                if (resp.getResponseHeaders() != null) cab.putAll(resp.getResponseHeaders());
+                cab.put("Cross-Origin-Opener-Policy", "same-origin");
+                cab.put("Cross-Origin-Embedder-Policy", "require-corp");
+                cab.put("Cross-Origin-Resource-Policy", "same-origin");
+                cab.put("Cache-Control", "no-cache");
+                resp.setResponseHeaders(cab);
+                return resp;
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
                 Uri u = r.getUrl();
-                if ("file".equals(u.getScheme())) return false;
+                if (DOMINIO.equals(u.getHost())) return false;
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, u));
                 } catch (Exception ignored) {
@@ -92,7 +127,7 @@ public class MainActivity extends Activity {
         });
 
         aplicarTema();
-        web.loadUrl("file:///android_asset/index.html");
+        web.loadUrl(INICIO);
     }
 
     @Override

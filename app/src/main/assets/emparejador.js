@@ -705,7 +705,7 @@
     return { ancho: w, alto: h, calcetines, D, umbralSegmentacion: seg.umbral };
   }
 
-  const api = { MAX_LADO, analizar, emparejar, edt, dilatar };
+  const api = { MAX_LADO, analizar, emparejar, edt, dilatar, erosionar, aLab, segmentar, etiquetar };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else global.Emparejador = api;
 })(typeof window !== 'undefined' ? window : globalThis);

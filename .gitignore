@@ -8,3 +8,6 @@ local.properties
 # Banco de pruebas generado
 herramientas/banco/
 __pycache__/
+app/src/main/assets/modelos/
+app/src/main/assets/ort/
+app/src/main/assets/_*

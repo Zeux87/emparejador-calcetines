@@ -139,9 +139,9 @@
   <div class="tarjeta">
     <h2>Para que acierte</h2>
     <ul class="consejos">
-      <li><span class="ic">1</span><span><b>Extiende los calcetines</b> sin que se toquen ni se monten unos encima de otros.</span></li>
-      <li><span class="ic">2</span><span><b>Fondo liso de tono medio</b>: suelo de madera, manta gris… Evita fondos blancos o negros.</span></li>
-      <li><span class="ic">3</span><span><b>Foto desde arriba</b>, con todos dentro y con buena luz, sin sombras fuertes.</span></li>
+      <li><span class="ic">1</span><span><b>Extiende los calcetines</b> por el suelo. Pueden tocarse, pero que no se monten unos encima de otros.</span></li>
+      <li><span class="ic">2</span><span><b>Fondo liso</b>: suelo, manta o sábana. Que se vea bien el dibujo de cada calcetín.</span></li>
+      <li><span class="ic">3</span><span><b>Foto desde arriba</b>, con todos dentro y con buena luz. La primera vez tarda más porque carga los modelos.</span></li>
       <li><span class="ic">4</span><span>Si alguno sale mal, pulsa <b>Corregir</b> y toca los dos calcetines que van juntos.</span></li>
     </ul>
   </div>
@@ -174,9 +174,9 @@
   <div class="herramientas">
     <p class="etiqueta-seg">Exigencia al emparejar</p>
     <div class="seg" id="exigencia">
-      <button data-u="0.45">Estricta</button>
-      <button data-u="0.6" class="activo">Normal</button>
-      <button data-u="0.8">Flexible</button>
+      <button data-nivel="0">Estricta</button>
+      <button data-nivel="1" class="activo">Normal</button>
+      <button data-nivel="2">Flexible</button>
     </div>
     <button class="chip" id="btnCorregir">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>
@@ -188,7 +188,9 @@
 <div id="cargando" class="oculto"><div class="caja"><div class="rueda"></div><span id="cargandoTxt">Buscando parejas…</span></div></div>
 <div id="toast" class="oculto"></div>
 
+<script src="ort/ort.wasm.min.js"></script>
 <script src="emparejador.js"></script>
+<script src="motor-ia.js"></script>
 <script>
 (function () {
   'use strict';
@@ -206,7 +208,9 @@
     mapa: null,         // Int32Array: índice de calcetín + 1 (cuerpo o anillo)
     pareja: null,       // Int32Array: pareja de cada calcetín o -1
     segura: null,       // Uint8Array
-    umbral: 0.6,
+    nivel: 1,           // 0 estricta, 1 normal, 2 flexible
+    motor: null,        // 'ia' o 'clasico'
+    tiempos: null,
     corregir: false,
     sel: -1,
   };
@@ -242,40 +246,72 @@
     });
   }
 
+  const UMBRAL_CLASICO = [0.45, 0.6, 0.8];
+
   async function procesarArchivo(archivo) {
     if (!archivo) return;
+    E.motor = null;
     cargando(true, 'Leyendo la foto…');
     await esperarPintado();
+    let img;
     try {
-      const img = await leerImagen(archivo);
-      const w0 = img.naturalWidth, h0 = img.naturalHeight;
-      const s = Math.min(1, Emparejador.MAX_LADO / Math.max(w0, h0));
-      const w = Math.round(w0 * s), h = Math.round(h0 * s);
-      const c = $('lienzo');
-      c.width = w; c.height = h;
-      const ctx = c.getContext('2d', { willReadFrequently: true });
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, w, h);
-      E.base = ctx.getImageData(0, 0, w, h);
-      cargando(true, 'Buscando parejas…');
-      await esperarPintado();
-      const t0 = performance.now();
-      E.analisis = Emparejador.analizar(E.base.data, w, h);
-      E.tiempo = Math.round(performance.now() - t0);
-      if (E.analisis.calcetines.length < 2) {
-        cargando(false);
-        toast('No encuentro calcetines. Prueba con un fondo liso que contraste.');
-        return;
-      }
-      prepararAnillos();
-      emparejarDeNuevo();
-      cargando(false);
-      mostrar('resultado');
+      img = await leerImagen(archivo);
     } catch (e) {
       cargando(false);
-      toast('No se ha podido analizar la foto.');
-      console.error(e);
+      toast('No se puede leer esa imagen.');
+      return;
     }
+    const t0 = performance.now();
+    let error = null;
+    if (window.MotorIA && window.ort) {
+      try {
+        const r = await MotorIA.analizar(img, { aviso: (t) => cargando(true, t) });
+        E.motor = 'ia';
+        E.analisis = r;
+        E.base = new ImageData(new Uint8ClampedArray(r.imagen), r.ancho, r.alto);
+        E.tiempos = r.tiempos;
+      } catch (e) {
+        error = e;
+        console.error(e);
+      }
+    }
+    if (E.motor !== 'ia') {
+      // Respaldo: motor clásico (sin IA)
+      try {
+        cargando(true, 'Buscando parejas (modo básico)…');
+        await esperarPintado();
+        const w0 = img.naturalWidth, h0 = img.naturalHeight;
+        const sc = Math.min(1, Emparejador.MAX_LADO / Math.max(w0, h0));
+        const w = Math.round(w0 * sc), h = Math.round(h0 * sc);
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, w, h);
+        E.base = ctx.getImageData(0, 0, w, h);
+        E.analisis = Emparejador.analizar(E.base.data, w, h);
+        E.motor = 'clasico';
+        E.tiempos = { total: Math.round(performance.now() - t0) };
+        if (error) toast('Modo básico: ' + (error.message || error));
+      } catch (e) {
+        cargando(false);
+        toast('No se ha podido analizar la foto.');
+        console.error(e);
+        return;
+      }
+    }
+    if (E.analisis.calcetines.length < 2) {
+      cargando(false);
+      toast('No encuentro calcetines. Prueba con más luz y un fondo liso.');
+      E.motor = null;
+      return;
+    }
+    const c = $('lienzo');
+    c.width = E.analisis.ancho; c.height = E.analisis.alto;
+    prepararAnillos();
+    emparejarDeNuevo();
+    cargando(false);
+    mostrar('resultado');
   }
 
   $('btnCamara').onclick = () => $('entradaCamara').click();
@@ -317,7 +353,9 @@
 
   function emparejarDeNuevo() {
     const n = E.analisis.calcetines.length;
-    const r = Emparejador.emparejar(E.analisis.D, E.umbral);
+    const r = E.motor === 'ia'
+      ? MotorIA.emparejar(E.analisis.S, E.nivel)
+      : Emparejador.emparejar(E.analisis.D, UMBRAL_CLASICO[E.nivel]);
     E.pareja = new Int32Array(n).fill(-1);
     E.segura = new Uint8Array(n);
     for (const p of r.parejas) {
@@ -386,7 +424,9 @@
     const huerf = calcetines.length - 2 * total;
     $('resumen').textContent = `${total} ${total === 1 ? 'pareja' : 'parejas'} · ${huerf} sin pareja`;
     const dudosas = numeracion().lista.filter(([a]) => !E.segura[a]).length;
-    $('subresumen').textContent = `${calcetines.length} calcetines` + (dudosas ? ` · ${dudosas} ${dudosas === 1 ? 'dudosa (?)' : 'dudosas (?)'}` : '');
+    const seg = E.tiempos ? ` · ${(E.tiempos.total / 1000).toFixed(1)} s` : '';
+    $('subresumen').textContent = `${calcetines.length} calcetines` + (dudosas ? ` · ${dudosas} ${dudosas === 1 ? 'dudosa (?)' : 'dudosas (?)'}` : '') +
+      seg + (E.motor === 'clasico' ? ' · modo básico' : '');
     actualizarInfo(num);
   }
 
@@ -466,7 +506,7 @@
   for (const b of $('exigencia').querySelectorAll('button')) {
     b.onclick = () => {
       for (const o of $('exigencia').querySelectorAll('button')) o.classList.toggle('activo', o === b);
-      E.umbral = parseFloat(b.dataset.u);
+      E.nivel = parseInt(b.dataset.nivel, 10);
       emparejarDeNuevo();
     };
   }
