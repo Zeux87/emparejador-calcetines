@@ -47,6 +47,7 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainActivity extends Activity {
 
@@ -67,9 +68,17 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> callback;
     private Uri fotoUri;
 
+    private static final String PAGINA_VERSIONES = "https://github.com/" + REPO + "/releases/latest";
+
     // Datos de la última versión encontrada en GitHub
     private volatile String urlApk = null;
     private volatile String versionNueva = null;
+
+    // Estado de la actualización: evita dos descargas a la vez y deja el instalador
+    // pendiente si la descarga acaba con la app en segundo plano
+    private final AtomicBoolean descargando = new AtomicBoolean(false);
+    private volatile File apkPendiente = null;
+    private volatile boolean enPrimerPlano = false;
 
     @Override
     protected void onCreate(Bundle estado) {
@@ -135,6 +144,23 @@ public class MainActivity extends Activity {
 
         aplicarTema();
         web.loadUrl(INICIO);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        enPrimerPlano = true;
+        File f = apkPendiente;
+        if (f != null) {
+            apkPendiente = null;
+            lanzarInstalador(f);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        enPrimerPlano = false;
+        super.onPause();
     }
 
     @Override
@@ -488,10 +514,50 @@ public class MainActivity extends Activity {
 
     /* ---------------- Descargar e instalar ---------------- */
 
+    private File dirActualizaciones() {
+        File dir = new File(getCacheDir(), "actualizaciones");
+        if (!dir.exists()) dir.mkdirs();
+        return dir;
+    }
+
+    // Comprueba que el archivo es un APK de esta app y más nuevo que el instalado
+    private String problemaApk(File f) {
+        if (f == null || !f.exists() || f.length() < 100_000) return "El archivo descargado está incompleto.";
+        try {
+            PackageInfo pi = getPackageManager().getPackageArchiveInfo(f.getAbsolutePath(), 0);
+            if (pi == null) return "El archivo descargado no es un APK válido.";
+            if (!getPackageName().equals(pi.packageName)) return "El archivo descargado no es de esta app.";
+            if (pi.getLongVersionCode() <= codigoVersion()) return "La versión descargada no es más nueva que la instalada.";
+        } catch (Exception e) {
+            return "No se puede leer el archivo descargado.";
+        }
+        return null;
+    }
+
+    private void errorActualizacion(String mensaje) {
+        llamarJs("onUpdateError", textoJs(mensaje));
+    }
+
+    private void lanzarInstalador(File f) {
+        runOnUiThread(() -> {
+            try {
+                Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fotos", f);
+                Intent i = new Intent(Intent.ACTION_VIEW);
+                i.setDataAndType(uri, "application/vnd.android.package-archive");
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(i);
+                llamarJs("onUpdateDone", textoJs("Confirma la instalación en la ventana de Android."));
+            } catch (Exception e) {
+                errorActualizacion("Android no ha abierto el instalador (" + e.getClass().getSimpleName() + ").");
+            }
+        });
+    }
+
     private void instalarActualizacion() {
         final String url = urlApk;
-        if (url == null) {
-            llamarJs("onUpdateDone", textoJs("Primero busca actualizaciones."));
+        final String version = versionNueva;
+        if (url == null || version == null) {
+            errorActualizacion("Primero busca actualizaciones.");
             return;
         }
         if (!getPackageManager().canRequestPackageInstalls()) {
@@ -505,45 +571,69 @@ public class MainActivity extends Activity {
             llamarJs("onUpdateDone", textoJs("Activa «Permitir de esta fuente» para Calcetines, vuelve atrás y pulsa Actualizar otra vez."));
             return;
         }
+        if (!descargando.compareAndSet(false, true)) {
+            llamarJs("onUpdateDone", textoJs("Ya se está descargando, espera un momento."));
+            return;
+        }
         new Thread(() -> {
             try {
-                File dir = new File(getCacheDir(), "actualizaciones");
-                if (!dir.exists()) dir.mkdirs();
-                File[] viejos = dir.listFiles();
-                if (viejos != null) for (File v : viejos) v.delete();
-                File destino = new File(dir, "Calcetines-" + versionNueva + ".apk");
-
-                HttpURLConnection c = abrir(url);
-                int code = c.getResponseCode();
-                if (code != 200) throw new Exception("HTTP " + code);
-                long total = c.getContentLengthLong();
-                try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(destino)) {
-                    byte[] buf = new byte[16384];
+                File dir = dirActualizaciones();
+                File destino = new File(dir, "Calcetines-" + version + ".apk");
+                // Si ya estaba descargada y es válida, no se vuelve a bajar
+                if (problemaApk(destino) != null) {
+                    File[] viejos = dir.listFiles();
+                    if (viejos != null) for (File v : viejos) v.delete();
+                    File parcial = new File(dir, "descarga.part");
+                    HttpURLConnection c = abrir(url);
+                    c.setReadTimeout(60000);
+                    int code = c.getResponseCode();
+                    if (code != 200) throw new Exception("GitHub ha respondido con el código " + code + ".");
+                    long total = c.getContentLengthLong();
                     long leido = 0;
-                    int ultimo = -1, n;
-                    while ((n = in.read(buf)) > 0) {
-                        out.write(buf, 0, n);
-                        leido += n;
-                        if (total > 0) {
-                            int pct = (int) (leido * 100 / total);
-                            if (pct >= ultimo + 5) {
-                                ultimo = pct;
-                                llamarJs("onUpdateProgress", String.valueOf(pct));
+                    try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(parcial)) {
+                        byte[] buf = new byte[65536];
+                        int ultimo = -1, n;
+                        while ((n = in.read(buf)) > 0) {
+                            out.write(buf, 0, n);
+                            leido += n;
+                            if (total > 0) {
+                                int pct = (int) (leido * 100 / total);
+                                if (pct >= ultimo + 2) {
+                                    ultimo = pct;
+                                    llamarJs("onUpdateProgress", pct + "," + (leido / 1048576) + "," + (total / 1048576));
+                                }
                             }
                         }
                     }
+                    if (total > 0 && leido != total) throw new Exception("La descarga se ha cortado. Vuelve a probar con buena conexión.");
+                    if (!parcial.renameTo(destino)) throw new Exception("No se ha podido guardar la descarga.");
                 }
-
-                Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fotos", destino);
-                Intent i = new Intent(Intent.ACTION_VIEW);
-                i.setDataAndType(uri, "application/vnd.android.package-archive");
-                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-                runOnUiThread(() -> startActivity(i));
-                llamarJs("onUpdateDone", textoJs("Descargada. Confirma la instalación en la ventana de Android."));
+                String problema = problemaApk(destino);
+                if (problema != null) throw new Exception(problema);
+                if (enPrimerPlano) {
+                    lanzarInstalador(destino);
+                } else {
+                    // Android no deja abrir el instalador con la app en segundo plano: se abre al volver
+                    apkPendiente = destino;
+                    llamarJs("onUpdateDone", textoJs("Descargada. Se instalará al volver a la app."));
+                }
             } catch (Exception e) {
-                llamarJs("onUpdateDone", textoJs("No se ha podido descargar la actualización. Revisa la conexión y vuelve a probar."));
+                String m = e.getMessage();
+                errorActualizacion(m != null && m.endsWith(".") ? m : "No se ha podido descargar la actualización. Revisa la conexión y vuelve a probar.");
+            } finally {
+                descargando.set(false);
             }
         }).start();
+    }
+
+    private void abrirPaginaVersiones() {
+        runOnUiThread(() -> {
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(PAGINA_VERSIONES)));
+            } catch (Exception e) {
+                Toast.makeText(this, "No hay ningún navegador", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     /* ---------------- Funciones visibles desde la página ---------------- */
@@ -562,6 +652,11 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void installUpdate() {
             instalarActualizacion();
+        }
+
+        @JavascriptInterface
+        public void openReleasePage() {
+            abrirPaginaVersiones();
         }
 
         @JavascriptInterface

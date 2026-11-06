@@ -59,6 +59,7 @@
   .aviso-act { border-color: var(--acento); }
   .aviso-act .fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .aviso-act button { background: var(--acento); color: var(--acento-texto); border-radius: 12px; padding: 10px 14px; font-weight: 600; }
+  .aviso-act button.enlace { background: none; color: var(--acento); padding: 8px 0 0; font-size: .85rem; border-radius: 0; text-align: left; }
   .pie { margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--texto-2); font-size: .85rem; }
   .pie button { color: var(--acento); font-weight: 600; padding: 8px 0; }
   #estadoAct { color: var(--texto-2); font-size: .85rem; min-height: 1.2em; }
@@ -166,6 +167,8 @@
       <div><b>Hay una versión nueva</b><br><span id="avisoActTxt" style="color:var(--texto-2);font-size:.9rem"></span></div>
       <button id="btnInstalar">Actualizar</button>
     </div>
+    <div id="avisoActEstado" style="color:var(--texto-2);font-size:.85rem;margin-top:8px"></div>
+    <button id="btnNavegador" class="enlace">¿No se instala? Descárgala con el navegador</button>
   </div>
 
   <div class="botones">
@@ -1096,10 +1099,44 @@
       $('estadoAct').textContent = `Tienes la última versión (${r.current}).`;
     }
   };
-  window.onUpdateProgress = (pct) => { $('estadoAct').textContent = `Descargando… ${pct} %`; };
-  window.onUpdateDone = (msg) => { $('estadoAct').textContent = msg; };
+  // Progreso de la descarga: ventana visible con porcentaje y megas
+  let actualizando = false;
+  function estadoAct(t) { $('estadoAct').textContent = t; $('avisoActEstado').textContent = t; }
+  window.onUpdateProgress = (dato) => {
+    const [pct, mb, total] = String(dato).split(',');
+    const txt = total ? `Descargando actualización… ${pct} % (${mb} de ${total} MB)` : `Descargando actualización… ${pct} %`;
+    estadoAct(txt);
+    if (actualizando) cargando(true, txt);
+  };
+  window.onUpdateDone = (msg) => {
+    actualizando = false;
+    cargando(false);
+    estadoAct(msg);
+    toast(msg);
+  };
+  window.onUpdateError = (msg) => {
+    actualizando = false;
+    cargando(false);
+    estadoAct(msg);
+    abrirModal('No se ha podido actualizar', `<div>${esc(msg)}</div><div>Puedes descargar la versión nueva con el navegador: abre el archivo <b>.apk</b> al terminar y pulsa <b>Actualizar</b>. No se pierden los datos.</div>`, [
+      { texto: 'Cerrar' },
+      { texto: 'Abrir en el navegador', clase: 'principal', accion: abrirVersiones },
+    ]);
+  };
+  function abrirVersiones() {
+    if (app && app.openReleasePage) app.openReleasePage();
+    else window.open('https://github.com/Zeux87/emparejador-calcetines/releases/latest', '_blank');
+  }
   $('btnBuscar').onclick = () => buscarAct(true);
-  $('btnInstalar').onclick = () => { $('estadoAct').textContent = 'Descargando…'; app && app.installUpdate(); };
+  $('btnNavegador').onclick = abrirVersiones;
+  $('btnInstalar').onclick = () => {
+    if (!app) return;
+    if (actualizando) { cargando(true, 'Descargando actualización…'); return; }
+    actualizando = true;
+    estadoAct('Preparando la descarga…');
+    cargando(true, 'Descargando actualización…');
+    app.installUpdate();
+  };
 
   $('version').textContent = app ? `Versión ${app.versionName()}` : 'Versión web';
   refrescarInicio();
