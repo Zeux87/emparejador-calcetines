@@ -64,7 +64,7 @@ node herramientas/banco-reales.js --barrido
 
 Los casos se guardan en `herramientas/casos-reales/`, que **no se sube** al repositorio (son fotos de tu casa y el repositorio es público). Si se suben, el flujo de compilación pasa el banco con ellos en cada versión.
 
-El flujo de compilación pasa siempre el banco con unos casos sintéticos de control (`herramientas/casos-control.py`), para comprobar que el motor arranca y empareja de principio a fin. El resultado sale en el resumen de la ejecución y no impide publicar.
+El flujo de compilación pasa siempre el banco con unos casos sintéticos de control (`herramientas/casos-control.py`), para comprobar que el motor arranca y empareja de principio a fin. Son dibujos planos, no fotos: el motor acierta 20 de sus 36 parejas y el paso avisa si baja de 18. El resultado sale en el resumen de la ejecución y no impide publicar.
 
 ## Banco de pruebas (motor básico)
 

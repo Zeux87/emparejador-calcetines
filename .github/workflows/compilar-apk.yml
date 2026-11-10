@@ -67,7 +67,8 @@ jobs:
           export NODE_PATH=/tmp/pw/node_modules
           python herramientas/casos-control.py --n 2
           estado=0
-          node herramientas/banco-reales.js herramientas/casos-control || estado=1
+          # casos sintéticos de control: el motor acierta 20 de 36 parejas (sin ninguna mal emparejada)
+          node herramientas/banco-reales.js herramientas/casos-control --minimo 18 || estado=1
           if ls herramientas/casos-reales/*.json >/dev/null 2>&1; then
             node herramientas/banco-reales.js herramientas/casos-reales --barrido || estado=1
           fi

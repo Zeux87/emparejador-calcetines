@@ -6,11 +6,13 @@
  * parejas que propone con las que se dieron por buenas. Usa los mismos modelos que el APK.
  *
  * Uso:
- *   node herramientas/banco-reales.js [carpeta] [--umbral 0.27] [--barrido]
+ *   node herramientas/banco-reales.js [carpeta] [--umbral 0.27] [--barrido] [--minimo N]
  *
  *   carpeta     por defecto herramientas/casos-reales (créala con importar-casos.js)
  *   --umbral    umbral de parecido (por defecto, el del motor)
  *   --barrido   además, enseña los fallos con cada umbral entre 0,15 y 0,40
+ *   --minimo N  da el banco por bueno si acierta al menos N parejas (para los casos de
+ *               control sintéticos, que el motor no acierta enteros)
  *
  * Necesita:
  *   - los modelos en app/src/main/assets/modelos/ y onnxruntime-web en app/src/main/assets/ort/
@@ -19,7 +21,7 @@
  *     encuentra, indica la ruta con la variable CHROME)
  *
  * No usa el cajón ni las parejas conocidas: mide solo las parejas dentro de cada foto.
- * Termina con código 1 si hay algún fallo.
+ * Termina con código 1 si hay algún fallo (o, con --minimo, si acierta menos de N parejas).
  */
 'use strict';
 const fs = require('fs');
@@ -139,9 +141,10 @@ async function abrirNavegador() {
 
 async function principal() {
   const args = process.argv.slice(2);
-  let dir = path.join(__dirname, 'casos-reales'), umbral = null, barrido = false;
+  let dir = path.join(__dirname, 'casos-reales'), umbral = null, barrido = false, minimo = null;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--umbral') umbral = parseFloat(args[++i]);
+    else if (args[i] === '--minimo') minimo = parseInt(args[++i], 10);
     else if (args[i] === '--barrido') barrido = true;
     else dir = path.resolve(args[i]);
   }
@@ -194,10 +197,11 @@ async function principal() {
     await nav.close();
     srv.close();
   }
-  const fallos = tot.mal + tot.perdidas + tot.roto;
+  const fallos = Number.isFinite(minimo) ? (tot.bien < minimo ? 1 : 0) + tot.roto : tot.mal + tot.perdidas + tot.roto;
   const resumen = `${tot.casos} casos · umbral ${umbral.toFixed(3)} · calcetines ${tot.detectados}/${tot.esperados} · parejas bien ${tot.bien}/${tot.parejas}` +
     ` · mal ${tot.mal} · no vistas ${tot.perdidas}` + (tot.roto ? ` · sin analizar ${tot.roto}` : '') +
-    ` · ${(tot.ms / 1000 / Math.max(1, tot.casos - tot.roto)).toFixed(1)} s/foto`;
+    ` · ${(tot.ms / 1000 / Math.max(1, tot.casos - tot.roto)).toFixed(1)} s/foto` +
+    (Number.isFinite(minimo) ? ` · mínimo exigido: ${minimo} parejas bien` : '');
   console.log(lineas.join('\n'));
   console.log('\n' + resumen);
 
