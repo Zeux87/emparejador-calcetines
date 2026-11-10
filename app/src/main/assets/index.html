@@ -394,11 +394,32 @@
   }
 
   /* ---------------------------------------------------------- cargar foto */
+  // Lee la foto y la reduce ya a 2048 px de lado (lo máximo que usa el motor): la foto
+  // original de la cámara (12-50 Mpx) se suelta enseguida y ocupa mucha menos memoria.
+  const LADO_MAX = 2048;
   function leerImagen(archivo) {
     return new Promise((ok, mal) => {
       const url = URL.createObjectURL(archivo);
       const img = new Image();
-      img.onload = () => { ok(img); setTimeout(() => URL.revokeObjectURL(url), 1000); };
+      img.onload = () => {
+        try {
+          const w0 = img.naturalWidth, h0 = img.naturalHeight;
+          if (!w0 || !h0) throw new Error('vacía');
+          const s = Math.min(1, LADO_MAX / Math.max(w0, h0));
+          const c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(w0 * s)); c.height = Math.max(1, Math.round(h0 * s));
+          const ctx = c.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, c.width, c.height);
+          img.src = '';
+          URL.revokeObjectURL(url);
+          ok(c);
+        } catch (e) {
+          URL.revokeObjectURL(url);
+          mal(e);
+        }
+      };
       img.onerror = () => { URL.revokeObjectURL(url); mal(new Error('No se puede leer la imagen')); };
       img.src = url;
     });
@@ -410,20 +431,43 @@
       const it = Almacen.get('cal_' + e.id);
       if (it) items.push(it);
     }
-    if (!items.length) return { items: [], huellas: [] };
+    if (!items.length) return { items: [], huellas: [], descriptores: [] };
     const r = await MotorIA.prepararCajon(items, { aviso });
     for (const it of r.actualizados) Almacen.set('cal_' + it.id, it);
-    const validos = [], huellas = [];
-    items.forEach((it, i) => { if (r.huellas[i]) { validos.push(it); huellas.push(r.huellas[i]); } });
-    return { items: validos, huellas };
+    const validos = [], huellas = [], descriptores = [];
+    items.forEach((it, i) => {
+      if (r.huellas[i]) { validos.push(it); huellas.push(r.huellas[i]); descriptores.push(r.descriptores[i] || null); }
+    });
+    return { items: validos, huellas, descriptores };
   }
 
+  function avisoFoto(titulo, texto) {
+    abrirModal(titulo, `<div>${texto}</div>
+      <div style="font-size:.9rem">Consejos: calcetines extendidos y sin montarse, fondo liso, foto desde arriba y con buena luz.</div>`,
+      [{ texto: 'Vale' }, { texto: 'Hacer otra foto', clase: 'principal', accion: () => $('entradaCamara').click() }]);
+  }
+
+  let ocupado = false;
   async function procesarArchivo(archivo) {
     if (!archivo) return;
+    if (ocupado) { toast('Espera, todavía estoy con la foto anterior.'); return; }
+    ocupado = true;
+    try {
+      await procesarArchivoInterno(archivo);
+    } finally {
+      ocupado = false;
+    }
+  }
+
+  async function procesarArchivoInterno(archivo) {
     E.motor = null;
     E.guardada = false;
     E.corregir = false;
+    // suelta el análisis anterior antes de empezar (memoria)
+    E.analisis = null; E.base = null; E.anillos = null; E.mapa = null;
     $('btnCorregir').classList.remove('activo');
+    if (!$('modal').classList.contains('oculto')) cerrarModal();
+    mostrar('inicio');
     cargando(true, 'Leyendo la foto…');
     await esperarPintado();
     let img;
@@ -431,7 +475,7 @@
       img = await leerImagen(archivo);
     } catch (e) {
       cargando(false);
-      toast('No se puede leer esa imagen.');
+      avisoFoto('No puedo leer la foto', 'La imagen no se ha podido abrir. Vuelve a hacerla o elige otra.');
       return;
     }
     const t0 = performance.now();
@@ -440,7 +484,7 @@
       try {
         const aviso = (t) => cargando(true, t);
         const cj = await cargarCajon(aviso);
-        const r = await MotorIA.analizar(img, { aviso, cajon: cj.huellas });
+        const r = await MotorIA.analizar(img, { aviso, cajon: cj.huellas, cajonDesc: cj.descriptores });
         E.motor = 'ia';
         E.analisis = r;
         E.nFoto = r.nFoto;
@@ -457,7 +501,7 @@
       try {
         cargando(true, 'Buscando parejas (modo básico)…');
         await esperarPintado();
-        const w0 = img.naturalWidth, h0 = img.naturalHeight;
+        const w0 = img.naturalWidth || img.width, h0 = img.naturalHeight || img.height;
         const sc = Math.min(1, Emparejador.MAX_LADO / Math.max(w0, h0));
         const w = Math.round(w0 * sc), h = Math.round(h0 * sc);
         const c = document.createElement('canvas');
@@ -475,14 +519,16 @@
         if (error) toast('Modo básico: ' + (error.message || error));
       } catch (e) {
         cargando(false);
-        toast('No se ha podido analizar la foto.');
         console.error(e);
+        avisoFoto('No se ha podido analizar', 'Ha fallado el análisis de la foto (' + esc(e.message || e) + ').');
         return;
       }
     }
     if (E.nFoto < 1 || (E.nFoto < 2 && !E.cajon.length)) {
       cargando(false);
-      toast(E.nFoto ? 'Solo veo un calcetín y el cajón está vacío.' : 'No encuentro calcetines. Prueba con más luz y un fondo liso.');
+      avisoFoto(E.nFoto ? 'Solo veo un calcetín' : 'No encuentro calcetines',
+        E.nFoto ? 'En la foto solo he encontrado un calcetín y el cajón está vacío, así que no hay con qué compararlo.'
+          : 'No he encontrado ningún calcetín en la foto.');
       E.motor = null;
       return;
     }
@@ -504,6 +550,31 @@
       procesarArchivo(f);
     });
   }
+
+  // Si Android ha cerrado la app mientras la cámara estaba abierta, la página se recarga y
+  // la foto llega por aquí en vez de por el botón. También recoge los avisos pendientes.
+  async function revisarPendientes() {
+    if (!app) return;
+    const aviso = app.takeNotice ? app.takeNotice() : null;
+    const url = app.takePendingPhoto ? app.takePendingPhoto() : null;
+    if (url) {
+      try {
+        cargando(true, 'Recuperando la foto…');
+        const r = await fetch(url);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const blob = await r.blob();
+        cargando(false);
+        await procesarArchivo(blob);
+      } catch (e) {
+        cargando(false);
+        console.error(e);
+        avisoFoto('No he podido recuperar la foto', 'La foto se ha hecho, pero no la he podido leer al volver de la cámara.');
+      }
+      return;
+    }
+    if (aviso) abrirModal('Aviso', `<div>${esc(aviso)}</div>`, [{ texto: 'Vale', clase: 'principal' }]);
+  }
+  window.onFotoPendiente = () => { revisarPendientes(); };
 
   /* ---------------------------------------------------------- dibujo */
   function prepararAnillos() {
@@ -836,6 +907,9 @@
     const { ancho: W, alto: H, calcetines } = E.analisis;
     const redondear = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null);
     const S = E.motor === 'ia' && E.analisis.S.length ? E.analisis.S.map((f) => Array.from(f, redondear)) : null;
+    // penalización por colores y dibujo de cada pareja (para revisar el ajuste con datos reales)
+    const P = S && E.analisis.P && E.analisis.P.length ? E.analisis.P.map((f) => Array.from(f, redondear)) : null;
+    const metrica = E.motor === 'ia' ? MotorIA.METRICA : null;
     const final = r.lista.map(([a, b]) => [a, b]);
 
     // 1. calcetines del cajón que han encontrado pareja: salen del cajón
@@ -853,6 +927,7 @@
           id: cid, fecha, nombre: '', sesion: id,
           miniatura: calcetines[i].miniatura,
           huella: MotorIA.huellaAGuardar(E.analisis.huellas[i]),
+          desc: MotorIA.descAGuardar(E.analisis.descriptores ? E.analisis.descriptores[i] : null),
           recorte: MotorIA.recorteAGuardar(E.analisis.recortes[i]),
         };
         if (!Almacen.set('cal_' + cid, it)) throw new Error('sin espacio');
@@ -872,10 +947,10 @@
         caja: [+(c.x0 / W).toFixed(4), +(c.y0 / H).toFixed(4), +(c.x1 / W).toFixed(4), +(c.y1 / H).toFixed(4)],
       })),
       prediccion: E.prediccion, final, alCajon: nuevos, tiempos: E.tiempos,
-      S, foto: fotoReducida(1600, 0.82),
+      metrica, S, P, foto: fotoReducida(1600, 0.82),
     };
     Almacen.set('ses_' + id, ses);
-    if (S) Almacen.set('apr_' + id, { S, nFoto: E.nFoto, final });
+    if (S) Almacen.set('apr_' + id, { S, nFoto: E.nFoto, final, metrica });
     const sesiones = Almacen.get('sesiones') || [];
     sesiones.push({ id, fecha, parejas: r.foto.length, cajon: r.cajon.length, alCajon: nuevos.length });
     Almacen.set('sesiones', sesiones);
@@ -884,18 +959,22 @@
 
   /* ---------------------------------------------------------- aprender de tus parejas confirmadas */
   // Busca el umbral con el que el motor habría acertado más parejas de las que has confirmado
+  // Las fotos guardadas con la forma de medir anterior (sin colores ni dibujo) solo se usan
+  // mientras no haya al menos 4 parejas confirmadas con la forma actual.
   function aprender() {
     const sesiones = (Almacen.get('sesiones') || []).slice(-40);
-    const datos = [];
-    let confirmadas = 0;
+    const todos = [];
     for (const s of sesiones) {
       const a = Almacen.get('apr_' + s.id);
       if (!a || !a.S) continue;
       const S = a.S.map((f) => f.map((v) => (v == null ? -Infinity : v)));
       const clave = (x, y) => (x < y ? x + '-' + y : y + '-' + x);
-      datos.push({ S, nFoto: a.nFoto, final: new Set(a.final.map(([x, y]) => clave(x, y))), clave });
-      confirmadas += a.final.length;
+      todos.push({ S, nFoto: a.nFoto, final: new Set(a.final.map(([x, y]) => clave(x, y))), clave,
+        n: a.final.length, actual: a.metrica === MotorIA.METRICA });
     }
+    const actuales = todos.filter((d) => d.actual);
+    const datos = actuales.reduce((s, d) => s + d.n, 0) >= 4 ? actuales : todos;
+    const confirmadas = datos.reduce((s, d) => s + d.n, 0);
     let mejorT = MotorIA.CFG.umbralBase, mejorErr = Infinity;
     for (let T = 0.15; T <= 0.40001; T += 0.005) {
       let err = 0;
@@ -1140,6 +1219,7 @@
 
   $('version').textContent = app ? `Versión ${app.versionName()}` : 'Versión web';
   refrescarInicio();
+  revisarPendientes();
   setTimeout(() => buscarAct(false), 800);
 })();
 </script>

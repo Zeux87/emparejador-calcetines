@@ -19,7 +19,9 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 - Hace la foto con la cámara o la coge de la galería. Todo se procesa en el móvil, sin conexión (unos 10-25 s; la primera vez algo más porque carga los modelos).
 - **SlimSAM** (modelo de segmentación) recorta cada calcetín por separado, aunque estén arrugados o se toquen.
 - **DINOv2** (modelo de visión) saca la huella de cada trozo del dibujo del calcetín. Para comparar dos calcetines se miran los 20 trozos más distintivos (logos, rayas, tramas) frente al resto de calcetines de la foto, así que cuenta el dibujo y no la forma con la que ha caído.
-- Dos calcetines son pareja si cada uno es el más parecido del otro y el parecido supera el umbral. Si no hay ninguno claro, se quedan sin pareja (**✕**); las parejas justas llevan **?**.
+- **Diferencias generales**: al parecido de DINOv2 se le resta cuando los calcetines se diferencian a simple vista: colores que uno tiene y el otro no (un gris liso frente a uno gris con franjas rojas) y distinta cantidad de dibujo (liso frente a rombos, rayas o tramas).
+- Dos calcetines son pareja si cada uno es el más parecido del otro y el parecido supera el umbral.
+- Si Android cierra la app mientras la cámara está abierta (pasa por falta de memoria), al volver la foto se recupera y se analiza igualmente. Si el análisis se queda sin memoria, la app se vuelve a abrir y lo avisa. Si no hay ninguno claro, se quedan sin pareja (**✕**); las parejas justas llevan **?**.
 - Si el motor de IA no puede arrancar, la app usa el motor básico anterior (colores y formas) y lo indica.
 - **Cajón de desparejados**: al pulsar **Hecho**, los calcetines que se quedan sin pareja se guardan en el móvil (miniatura y huella). En las fotos siguientes se comparan también con los del cajón y, si aparece su pareja, se marca con la etiqueta «cajón» y una tarjeta con la miniatura del guardado. Al confirmar, salen del cajón. Desde la pantalla del cajón se les puede poner nombre o borrarlos.
 - **Aprende de tus correcciones**: cada vez que pulsas **Hecho** se guardan las parejas confirmadas (con tus correcciones). A partir de 4 parejas confirmadas, la app ajusta el umbral de parecido al que mejor habría acertado con tus calcetines.
@@ -52,6 +54,14 @@ node herramientas/banco-pruebas.js
 ```
 
 Genera fotos sintéticas (fondo de madera y sábana beige) con parejas conocidas y un calcetín huérfano, y comprueba cuántas parejas acierta. El motor con IA se ha ajustado con fotos reales.
+
+Para la penalización por colores y dibujo del motor con IA (no necesita los modelos):
+
+```
+node herramientas/prueba-diferencias.js
+```
+
+Las sesiones exportadas guardan esa penalización (`P`) junto al parecido (`S`) para poder reajustarla con fotos reales.
 
 ## Actualizaciones
 

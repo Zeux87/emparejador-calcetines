@@ -16,6 +16,7 @@ import android.util.Base64;
 import android.util.JsonWriter;
 import android.view.View;
 import android.webkit.JavascriptInterface;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -80,9 +81,43 @@ public class MainActivity extends Activity {
     private volatile File apkPendiente = null;
     private volatile boolean enPrimerPlano = false;
 
+    // Foto que llega cuando la página ya no la está esperando: pasa si Android cierra la app
+    // mientras la cámara está abierta (los modelos ocupan mucha memoria). Al volver, la página
+    // se ha recargado desde cero; la foto se copia aquí y la página la recoge al arrancar.
+    private static final String CLAVE_FOTO = "fotoUri";
+    private static final String CLAVE_PIDIENDO = "pidiendo";
+    private final Object cerrojoPendiente = new Object();
+    private String fotoPendiente = null;   // URL https://appassets…/fotos/… lista para leer
+    private String avisoPendiente = null;  // mensaje para mostrar al cargar la página
+    private int pidiendo = 0;              // REQ_CAMARA / REQ_GALERIA mientras se espera la foto
+
     @Override
     protected void onCreate(Bundle estado) {
         super.onCreate(estado);
+        if (estado != null) {
+            String u = estado.getString(CLAVE_FOTO);
+            if (u != null) fotoUri = Uri.parse(u);
+            pidiendo = estado.getInt(CLAVE_PIDIENDO, 0);
+        }
+        crearWeb();
+        aplicarTema();
+        web.loadUrl(INICIO);
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle estado) {
+        super.onSaveInstanceState(estado);
+        if (fotoUri != null) estado.putString(CLAVE_FOTO, fotoUri.toString());
+        estado.putInt(CLAVE_PIDIENDO, pidiendo);
+    }
+
+    private File dirFotos() {
+        File dir = new File(getCacheDir(), "fotos");
+        if (!dir.exists()) dir.mkdirs();
+        return dir;
+    }
+
+    private void crearWeb() {
         web = new WebView(this);
         setContentView(web);
 
@@ -97,6 +132,7 @@ public class MainActivity extends Activity {
         cargador = new WebViewAssetLoader.Builder()
                 .setDomain(DOMINIO)
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .addPathHandler("/fotos/", new WebViewAssetLoader.InternalStoragePathHandler(this, dirFotos()))
                 .build();
 
         web.setWebViewClient(new WebViewClient() {
@@ -129,6 +165,29 @@ public class MainActivity extends Activity {
                 }
                 return true;
             }
+
+            // Si el motor de la página se queda sin memoria, Android mata su proceso. Sin esto
+            // se cerraría toda la app; así se vuelve a abrir la página y se explica qué ha pasado.
+            @Override
+            public boolean onRenderProcessGone(WebView v, RenderProcessGoneDetail d) {
+                if (v != web) return true;
+                synchronized (cerrojoPendiente) {
+                    avisoPendiente = "El análisis se ha quedado sin memoria y Android lo ha cerrado. "
+                            + "Cierra otras apps abiertas y vuelve a probar; si se repite, haz la foto un poco más lejos.";
+                }
+                if (callback != null) {
+                    callback.onReceiveValue(null);
+                    callback = null;
+                }
+                try {
+                    web.destroy();
+                } catch (Exception ignored) {
+                }
+                crearWeb();
+                aplicarTema();
+                web.loadUrl(INICIO);
+                return true;
+            }
         });
 
         web.setWebChromeClient(new WebChromeClient() {
@@ -141,9 +200,6 @@ public class MainActivity extends Activity {
                 return true;
             }
         });
-
-        aplicarTema();
-        web.loadUrl(INICIO);
     }
 
     @Override
@@ -217,8 +273,7 @@ public class MainActivity extends Activity {
 
     private void lanzarCamara() {
         try {
-            File dir = new File(getCacheDir(), "fotos");
-            if (!dir.exists()) dir.mkdirs();
+            File dir = dirFotos();
             File[] viejas = dir.listFiles();
             if (viejas != null) for (File v : viejas) v.delete();
             File f = new File(dir, "calcetines_" + System.currentTimeMillis() + ".jpg");
@@ -226,6 +281,7 @@ public class MainActivity extends Activity {
             Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
             i.putExtra(MediaStore.EXTRA_OUTPUT, fotoUri);
             i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            pidiendo = REQ_CAMARA;
             startActivityForResult(i, REQ_CAMARA);
         } catch (Exception e) {
             Toast.makeText(this, "No se ha podido abrir la cámara", Toast.LENGTH_SHORT).show();
@@ -238,8 +294,10 @@ public class MainActivity extends Activity {
         i.setType("image/*");
         i.addCategory(Intent.CATEGORY_OPENABLE);
         try {
+            pidiendo = REQ_GALERIA;
             startActivityForResult(Intent.createChooser(i, "Elige la foto de los calcetines"), REQ_GALERIA);
         } catch (Exception e) {
+            pidiendo = 0;
             devolverFoto(null);
         }
     }
@@ -254,16 +312,75 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
-        if (callback == null) return;
-        Uri[] resultado = null;
+        if (req != REQ_CAMARA && req != REQ_GALERIA) return;
+        pidiendo = 0;
+        Uri origen = null;
         if (res == RESULT_OK) {
             if (req == REQ_CAMARA && fotoUri != null) {
-                resultado = new Uri[]{fotoUri};
+                origen = fotoUri;
             } else if (req == REQ_GALERIA && data != null && data.getData() != null) {
-                resultado = new Uri[]{data.getData()};
+                origen = data.getData();
             }
         }
-        devolverFoto(resultado);
+        if (callback != null) {
+            devolverFoto(origen != null ? new Uri[]{origen} : null);
+            return;
+        }
+        // La página ya no espera la foto: Android ha cerrado la app mientras estaba la cámara
+        // (o la galería) abierta y la ha vuelto a abrir. Se copia la foto y la página la recoge.
+        if (origen != null) recuperarFoto(origen, req == REQ_CAMARA);
+    }
+
+    private void recuperarFoto(final Uri origen, final boolean deCamara) {
+        // la galería concede el permiso de lectura solo mientras dura este momento: se copia ya
+        new Thread(() -> {
+            try {
+                File dir = dirFotos();
+                File destino = new File(dir, "recuperada_" + System.currentTimeMillis() + ".jpg");
+                long bytes = 0;
+                try (InputStream in = getContentResolver().openInputStream(origen);
+                     OutputStream out = new FileOutputStream(destino)) {
+                    if (in == null) throw new Exception("sin datos");
+                    byte[] buf = new byte[65536];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                        bytes += n;
+                    }
+                }
+                if (bytes < 1000) {
+                    destino.delete();
+                    throw new Exception("vacía");
+                }
+                synchronized (cerrojoPendiente) {
+                    fotoPendiente = "https://" + DOMINIO + "/fotos/" + destino.getName();
+                }
+                llamarJs("onFotoPendiente", "0");
+            } catch (Exception e) {
+                synchronized (cerrojoPendiente) {
+                    avisoPendiente = deCamara
+                            ? "La cámara no ha devuelto la foto. Vuelve a hacerla."
+                            : "No se ha podido leer la foto elegida. Vuelve a elegirla.";
+                }
+                llamarJs("onFotoPendiente", "0");
+            }
+        }).start();
+    }
+
+    private String tomarFotoPendiente() {
+        synchronized (cerrojoPendiente) {
+            String f = fotoPendiente;
+            fotoPendiente = null;
+            return f;
+        }
+    }
+
+    private String tomarAvisoPendiente() {
+        synchronized (cerrojoPendiente) {
+            String a = avisoPendiente;
+            avisoPendiente = null;
+            return a;
+        }
     }
 
     @Override
@@ -432,8 +549,11 @@ public class MainActivity extends Activity {
     /* ---------------- Comunicación con la página ---------------- */
 
     private void llamarJs(final String funcion, final String argumentoJson) {
-        web.post(() -> web.evaluateJavascript(
-                "window." + funcion + " && window." + funcion + "(" + argumentoJson + ")", null));
+        runOnUiThread(() -> {
+            if (web == null) return;
+            web.evaluateJavascript(
+                    "window." + funcion + " && window." + funcion + "(" + argumentoJson + ")", null);
+        });
     }
 
     private static String textoJs(String s) {
@@ -682,6 +802,18 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void exportData() {
             exportarDatos();
+        }
+
+        // Foto recuperada tras volver de la cámara con la página recargada (o null)
+        @JavascriptInterface
+        public String takePendingPhoto() {
+            return tomarFotoPendiente();
+        }
+
+        // Aviso pendiente (por ejemplo, el análisis se quedó sin memoria) o null
+        @JavascriptInterface
+        public String takeNotice() {
+            return tomarAvisoPendiente();
         }
     }
 }

@@ -9,6 +9,9 @@
  *   4. Parecido entre dos calcetines: para cada trozo de A se busca el más parecido
  *      en B y se compara con lo que se parece al resto de calcetines de la foto;
  *      cuentan los 20 trozos más distintivos (logos, rayas…), no la forma.
+ *      Después se resta parecido por diferencias generales que DINOv2 no castiga:
+ *      colores que uno tiene y el otro no (franjas, rombos de otro color) y diferente
+ *      cantidad de dibujo (liso frente a rayas, rombos o tramas).
  *   5. Pareja = cada uno es el más parecido del otro y el parecido supera el umbral.
  *   6. Los calcetines guardados en el cajón entran en la comparación: uno de la foto
  *      puede emparejarse con uno del cajón (de otra colada).
@@ -34,6 +37,14 @@
     difColorDividir: 12,  // ΔE mínima entre partes para separar una máscara mezclada
     parteMin: 0.2,        // máscara menor que el 20 % de un calcetín típico = un trozo
     bordeMax: 6,          // píxeles de máscara (a 1/4) tocando el borde: más es un mueble cortado
+    // Diferencias generales (se restan al parecido de DINOv2):
+    colorTol: 0.06,       // parte del calcetín de un color que el otro no tiene, tolerada (talón escondido…)
+    colorTolCajon: 0.14,  // más tolerancia con el cajón: otra foto, otra luz
+    colorPeso: 1.5,
+    dibujoTol: 0.05,      // diferencia tolerada en la parte del calcetín que es dibujo (bordes)
+    dibujoPeso: 1.4,
+    dibujoBorde: 12,      // ΔE entre píxeles vecinos a partir del cual hay un borde de dibujo (las arrugas no llegan)
+    penalMax: 0.6,
   };
   const MEDIA = [0.485, 0.456, 0.406], DESV = [0.229, 0.224, 0.225];
   const FONDO = [104, 116, 124]; // gris neutro (RGB) detrás de cada recorte
@@ -484,9 +495,145 @@
     return res;
   }
 
+  /* ------------------------------------------------------------ diferencias generales: colores y dibujo */
+  //
+  // DINOv2 premia los trozos que coinciden, pero no castiga lo que un calcetín tiene y el
+  // otro no: uno gris liso "cabe" dentro de uno gris con franjas rojas y salen parecidos.
+  // Estas dos medidas miran el calcetín entero y restan parecido cuando hay diferencias claras:
+  //   · colores: qué parte de un calcetín es de un color que el otro no tiene (franjas, talón…)
+  //   · dibujo: qué parte del calcetín son bordes de dibujo (rombos, rayas, tramas) frente a liso
+
+  const NL = 10, NAB = 16, NBINS = NL * NAB * NAB; // L de 10 en 10; a y b de 10 en 10 entre -80 y 80
+  const binDe = (L, a, b) => {
+    const iL = Math.max(0, Math.min(NL - 1, Math.floor(L / 10)));
+    const ia = Math.max(0, Math.min(NAB - 1, Math.floor((a + 80) / 10)));
+    const ib = Math.max(0, Math.min(NAB - 1, Math.floor((b + 80) / 10)));
+    return (iL * NAB + ia) * NAB + ib;
+  };
+
+  // Suma de cada casilla con sus vecinas (3x3x3): colores casi iguales cuentan como el mismo
+  function dilatarHist(h) {
+    const t1 = new Float32Array(NBINS), t2 = new Float32Array(NBINS), out = new Float32Array(NBINS);
+    for (let l = 0; l < NL; l++) for (let a = 0; a < NAB; a++) for (let b = 0; b < NAB; b++) {
+      const i = (l * NAB + a) * NAB + b;
+      t1[i] = h[i] + (b > 0 ? h[i - 1] : 0) + (b < NAB - 1 ? h[i + 1] : 0);
+    }
+    for (let l = 0; l < NL; l++) for (let a = 0; a < NAB; a++) for (let b = 0; b < NAB; b++) {
+      const i = (l * NAB + a) * NAB + b;
+      t2[i] = t1[i] + (a > 0 ? t1[i - NAB] : 0) + (a < NAB - 1 ? t1[i + NAB] : 0);
+    }
+    const pl = NAB * NAB;
+    for (let i = 0; i < NBINS; i++) {
+      const l = (i / pl) | 0;
+      out[i] = t2[i] + (l > 0 ? t2[i - pl] : 0) + (l < NL - 1 ? t2[i + pl] : 0);
+    }
+    return out;
+  }
+
+  /**
+   * Descriptor general de un calcetín a partir de su recorte plegado (224x224 + cobertura).
+   * { hist (colores, suma 1), dil (hist dilatado), dibujo (0-1), n (píxeles) } o null
+   */
+  function descriptor(rec) {
+    if (!rec) return null;
+    const lado = 224, P = lado * lado;
+    const { rgb, cob } = rec;
+    const rgba = new Uint8ClampedArray(P * 4);
+    for (let o = 0; o < P; o++) {
+      rgba[4 * o] = rgb[3 * o]; rgba[4 * o + 1] = rgb[3 * o + 1]; rgba[4 * o + 2] = rgb[3 * o + 2];
+    }
+    const lab = global.Emparejador.aLab(rgba, P);
+    const dentro = new Uint8Array(P);
+    const hist = new Float32Array(NBINS);
+    let n = 0;
+    for (let o = 0; o < P; o++) {
+      if (cob[o] < 0.99) continue;
+      dentro[o] = 1;
+      hist[binDe(lab.L[o], lab.A[o], lab.B[o])]++;
+      n++;
+    }
+    if (n < 300) return null;
+    for (let i = 0; i < NBINS; i++) hist[i] /= n;
+    // dibujo: píxeles con un salto de color claro respecto a su vecino (bordes de rayas, rombos…)
+    const u2 = CFG.dibujoBorde * CFG.dibujoBorde;
+    let bordes = 0, m = 0;
+    const dE2 = (p, q) => {
+      const dl = lab.L[p] - lab.L[q], da = lab.A[p] - lab.A[q], db = lab.B[p] - lab.B[q];
+      return dl * dl + da * da + db * db;
+    };
+    for (let y = 1; y < lado - 1; y++) {
+      for (let x = 1; x < lado - 1; x++) {
+        const o = y * lado + x;
+        if (!dentro[o] || !dentro[o - 1] || !dentro[o + 1] || !dentro[o - lado] || !dentro[o + lado]) continue;
+        m++;
+        // diferencia central (salta 2 píxeles: el recorte está algo suavizado)
+        if (dE2(o - 1, o + 1) + dE2(o - lado, o + lado) > u2) bordes++;
+      }
+    }
+    return { hist, dil: dilatarHist(hist), dibujo: m ? bordes / m : 0, n };
+  }
+
+  // Parte de A que es de colores que B no tiene (0 = todos sus colores están en B)
+  function colorQueFalta(A, B) {
+    let s = 0;
+    const h = A.hist, d = B.dil;
+    for (let i = 0; i < NBINS; i++) if (h[i] > d[i]) s += h[i] - d[i];
+    return s;
+  }
+
+  /** Cuánto parecido se quita a la pareja (a, b) por diferencias de colores y de dibujo. */
+  function penalizacion(da, db, cruzada) {
+    if (!da || !db) return 0;
+    const falta = Math.max(colorQueFalta(da, db), colorQueFalta(db, da));
+    const pc = CFG.colorPeso * Math.max(0, falta - (cruzada ? CFG.colorTolCajon : CFG.colorTol));
+    const pd = CFG.dibujoPeso * Math.max(0, Math.abs(da.dibujo - db.dibujo) - CFG.dibujoTol);
+    return Math.min(CFG.penalMax, pc + pd);
+  }
+
+  // Resta las penalizaciones a la matriz de parecidos; devuelve la matriz de penalizaciones
+  function aplicarDiferencias(S, descs, nFoto) {
+    const n = S.length;
+    const P = Array.from({ length: n }, () => new Float64Array(n));
+    if (!descs) return P;
+    for (let a = 0; a < n; a++) {
+      for (let b = a + 1; b < n; b++) {
+        if (!Number.isFinite(S[a][b])) continue;
+        const p = penalizacion(descs[a], descs[b], a >= nFoto || b >= nFoto);
+        if (!p) continue;
+        P[a][b] = P[b][a] = p;
+        S[a][b] -= p; S[b][a] = S[a][b];
+      }
+    }
+    return P;
+  }
+
+  const VERSION_DESC = 'colores-dibujo-v1';
+
+  function descAGuardar(d) {
+    if (!d) return null;
+    const bins = [];
+    for (let i = 0; i < NBINS; i++) if (d.hist[i] >= 0.001) bins.push(i, Math.round(d.hist[i] * 10000));
+    return { version: VERSION_DESC, bins, dibujo: Math.round(d.dibujo * 10000) / 10000, n: d.n };
+  }
+
+  function descDeGuardado(g) {
+    if (!g || g.version !== VERSION_DESC || !Array.isArray(g.bins)) return null;
+    const hist = new Float32Array(NBINS);
+    let s = 0;
+    for (let k = 0; k + 1 < g.bins.length; k += 2) {
+      const i = g.bins[k];
+      if (i >= 0 && i < NBINS) { hist[i] = g.bins[k + 1]; s += g.bins[k + 1]; }
+    }
+    if (!s) return null;
+    for (let i = 0; i < NBINS; i++) hist[i] /= s;
+    return { hist, dil: dilatarHist(hist), dibujo: +g.dibujo || 0, n: g.n || 0 };
+  }
+
   /* ------------------------------------------------------------ guardar y recuperar (cajón) */
 
   const VERSION_HUELLA = 'dinov2s-q8-plegado224-v1';
+  // Cambia cuando cambia la forma de calcular el parecido (para aprender solo de datos comparables)
+  const METRICA = 'dino-top20+colores-dibujo-v1';
 
   function aBase64(bytes) {
     let s = '';
@@ -554,27 +701,42 @@
   }
 
   /**
-   * Prepara las huellas de los calcetines del cajón. Si alguna es de otra versión del
-   * modelo, la recalcula desde su recorte. Devuelve { huellas, actualizados } donde
-   * actualizados son los elementos con la huella nueva (hay que volver a guardarlos).
+   * Prepara las huellas y los descriptores de colores y dibujo de los calcetines del cajón.
+   * Si alguno falta o es de otra versión, lo recalcula desde su recorte guardado.
+   * Devuelve { huellas, descriptores, actualizados } donde actualizados son los elementos
+   * que han cambiado (hay que volver a guardarlos).
    */
   async function prepararCajon(items, opciones) {
     const op = opciones || {};
-    const huellas = [], actualizados = [];
+    const huellas = [], descriptores = [], actualizados = [];
     let s = null;
     for (const it of items) {
       let h = huellaDeGuardada(it.huella);
-      if (!h && it.recorte) {
-        s = s || await cargarModelos(op.base || '', op.aviso);
+      let d = descDeGuardado(it.desc);
+      let cambiado = false;
+      if ((!h || !d) && it.recorte) {
         op.aviso && op.aviso('Actualizando el cajón…');
-        const rec = await recorteDeGuardado(it.recorte);
-        h = (await huellasDino(s, [rec]))[0];
-        it.huella = huellaAGuardar(h);
-        actualizados.push(it);
+        try {
+          const rec = await recorteDeGuardado(it.recorte);
+          if (!h) {
+            s = s || await cargarModelos(op.base || '', op.aviso);
+            h = (await huellasDino(s, [rec]))[0];
+            it.huella = huellaAGuardar(h);
+            cambiado = true;
+          }
+          if (!d) {
+            d = descriptor(rec);
+            if (d) { it.desc = descAGuardar(d); cambiado = true; }
+          }
+        } catch (e) {
+          console.error(e);
+        }
       }
+      if (cambiado) actualizados.push(it);
       huellas.push(h);
+      descriptores.push(d);
     }
-    return { huellas, actualizados };
+    return { huellas, descriptores, actualizados };
   }
 
   /* ------------------------------------------------------------ parecidos */
@@ -708,7 +870,9 @@
   async function analizar(img, opciones) {
     const op = opciones || {};
     const aviso = op.aviso || null;
-    const cajon = op.cajon || [];
+    // calcetines del cajón válidos (con huella), con su descriptor de colores y dibujo
+    const cajonDesc = op.cajonDesc || [];
+    const cajonOk = (op.cajon || []).map((h, i) => ({ h, d: cajonDesc[i] || null })).filter((x) => x.h);
     const t0 = performance.now();
     const s = await cargarModelos(op.base || '', aviso);
     const t1 = performance.now();
@@ -732,17 +896,20 @@
       });
     }
     const huellas = await huellasDino(s, recortes, aviso);
+    const descriptores = recortes.map(descriptor);
     const t3 = performance.now();
-    const todas = huellas.concat(cajon.filter(Boolean));
-    let S = [];
+    const todas = huellas.concat(cajonOk.map((x) => x.h));
+    const descTodas = descriptores.concat(cajonOk.map((x) => x.d));
+    let S = [], P = [];
     if (calcetines.length >= 2 || (calcetines.length >= 1 && todas.length >= 3)) {
       aviso && aviso('Buscando parejas…');
       await pausa();
       S = await matrizParecidos(todas, huellas.length, aviso);
+      P = aplicarDiferencias(S, descTodas, huellas.length);
     }
     const t4 = performance.now();
     return {
-      ancho: I2.w, alto: I2.h, imagen: I2.data, calcetines, S, huellas, recortes, nFoto: huellas.length,
+      ancho: I2.w, alto: I2.h, imagen: I2.data, calcetines, S, P, huellas, recortes, descriptores, nFoto: huellas.length,
       tiempos: {
         modelos: Math.round(t1 - t0), sam: Math.round(t2 - t1), dino: Math.round(t3 - t2),
         parecidos: Math.round(t4 - t3), total: Math.round(t4 - t0), hilos: s.hilos, puntos: sam.puntos,
@@ -751,7 +918,8 @@
   }
 
   global.MotorIA = {
-    CFG, VERSION_HUELLA, analizar, emparejar, cargarModelos, matrizParecidos,
+    CFG, VERSION_HUELLA, VERSION_DESC, METRICA, analizar, emparejar, cargarModelos, matrizParecidos,
     huellaAGuardar, huellaDeGuardada, recorteAGuardar, prepararCajon,
+    descriptor, penalizacion, aplicarDiferencias, descAGuardar, descDeGuardado,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
