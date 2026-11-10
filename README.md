@@ -24,6 +24,9 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 - Si Android cierra la app mientras la cámara está abierta (pasa por falta de memoria), al volver la foto se recupera y se analiza igualmente. Si el análisis se queda sin memoria, la app se vuelve a abrir y lo avisa. Si no hay ninguno claro, se quedan sin pareja (**✕**); las parejas justas llevan **?**.
 - Si el motor de IA no puede arrancar, la app usa el motor básico anterior (colores y formas) y lo indica.
 - **Cajón de desparejados**: al pulsar **Hecho**, los calcetines que se quedan sin pareja se guardan en el móvil (miniatura y huella). En las fotos siguientes se comparan también con los del cajón y, si aparece su pareja, se marca con la etiqueta «cajón» y una tarjeta con la miniatura del guardado. Al confirmar, salen del cajón. Desde la pantalla del cajón se les puede poner nombre o borrarlos.
+- **Parejas conocidas**: al pulsar **Hecho**, cada pareja confirmada se recuerda en el móvil (miniatura y huella de uno de los dos calcetines). Si más adelante un calcetín de una pareja conocida sale solo en una foto, la app lo reconoce, enseña de cuál es y avisa de que falta el otro; si va al cajón, hereda el nombre. Una pareja que ya se conocía no se duplica: suma una vista. Desde la pantalla **Parejas conocidas** se les puede poner nombre o borrarlas. Las parejas conocidas solo sirven para reconocer: no cambian qué calcetines de la foto se emparejan.
+- **Revisar dudosas**: las parejas justas (con **?**) se revisan una a una con los dos calcetines lado a lado: **Sí, son pareja**, **No lo son** o **No lo sé**. Una pareja rechazada no se vuelve a proponer en esa foto, y lo que decidas cuenta para el ajuste del umbral.
+- **Casos de prueba**: al pulsar **Hecho** se puede marcar «Guardar la foto como caso de prueba». La foto entera y las parejas dadas por buenas se guardan para medir el acierto del motor con fotos reales (ver «Banco de pruebas con fotos reales»).
 - **Aprende de tus correcciones**: cada vez que pulsas **Hecho** se guardan las parejas confirmadas (con tus correcciones). A partir de 4 parejas confirmadas, la app ajusta el umbral de parecido al que mejor habría acertado con tus calcetines.
 - **Exportar datos para mejorar**: genera un JSON con las fotos guardadas, las parejas confirmadas y el cajón, para compartirlo y ajustar el motor con fotos reales.
 - **Exigencia** (Estricta / Normal / Flexible): cuánto se tienen que parecer dos calcetines para emparejarlos.
@@ -40,8 +43,28 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 - `app/src/main/assets/index.html`: la interfaz.
 - `app/src/main/java/es/pablo/calcetines/MainActivity.java`: la ventana Android (cámara, galería, compartir y actualizaciones).
 - `.github/workflows/compilar-apk.yml`: compila y publica el APK.
-- `herramientas/`: banco de pruebas con fotos sintéticas.
+- `herramientas/`: bancos de pruebas (fotos reales y sintéticas).
 - `prototipo-python/`: el prototipo original en Python/OpenCV.
+
+## Banco de pruebas con fotos reales (motor con IA)
+
+Mide cuántas parejas acierta el motor con IA en fotos de verdad, con los mismos modelos que lleva el APK.
+
+1. En la app, al pulsar **Hecho**, marca «Guardar la foto como caso de prueba» (solo si cada calcetín está bien rodeado y las parejas son las correctas).
+2. En la pantalla de inicio, pulsa **Exportar datos para mejorar** y guarda el archivo `.json`.
+3. Importa los casos y pasa el banco:
+
+```
+node herramientas/importar-casos.js calcetines-datos-AAAA-MM-DD.json
+npm install --no-save playwright
+node herramientas/banco-reales.js --barrido
+```
+
+`banco-reales.js` abre la app en Chrome sin ventana, analiza cada foto y compara las parejas con las guardadas. Necesita los modelos en `app/src/main/assets/modelos/` y onnxruntime-web en `app/src/main/assets/ort/` (los pasos están en el flujo de compilación). Con `--barrido` enseña los fallos con cada umbral. No usa el cajón ni las parejas conocidas.
+
+Los casos se guardan en `herramientas/casos-reales/`, que **no se sube** al repositorio (son fotos de tu casa y el repositorio es público). Si se suben, el flujo de compilación pasa el banco con ellos en cada versión.
+
+El flujo de compilación pasa siempre el banco con unos casos sintéticos de control (`herramientas/casos-control.py`), para comprobar que el motor arranca y empareja de principio a fin. El resultado sale en el resumen de la ejecución y no impide publicar.
 
 ## Banco de pruebas (motor básico)
 

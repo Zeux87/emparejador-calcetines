@@ -97,8 +97,8 @@
   .rueda { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--superficie-2); border-top-color: var(--acento); animation: g 0.9s linear infinite; }
   @keyframes g { to { transform: rotate(360deg); } }
   /* ---------- cajón ---------- */
-  #cajonVista { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--fondo); }
-  #cajonVista .contenido { flex: 1; overflow-y: auto; padding: 4px 14px calc(20px + env(safe-area-inset-bottom)); }
+  #cajonVista, #catalogoVista { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--fondo); }
+  #cajonVista .contenido, #catalogoVista .contenido { flex: 1; overflow-y: auto; padding: 4px 14px calc(20px + env(safe-area-inset-bottom)); }
   .rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
   .ficha { background: var(--superficie); border: 1px solid var(--borde); border-radius: 14px; overflow: hidden; text-align: left; padding: 0; }
   .ficha img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: #7c7468; }
@@ -139,6 +139,11 @@
   .fila-cajon span { flex: 1; color: var(--texto-2); font-size: .9rem; }
   .fila-cajon span b { display: block; color: var(--texto); }
   .ficha-grande { width: 100%; max-height: 40vh; object-fit: contain; border-radius: 12px; background: #7c7468; }
+  .lado-a-lado { display: flex; gap: 10px; }
+  .lado-a-lado figure { flex: 1; min-width: 0; margin: 0; text-align: center; font-size: .85rem; }
+  .lado-a-lado img { display: block; width: 100%; height: 34vh; object-fit: contain; border-radius: 12px; background: #7c7468; margin-bottom: 6px; }
+  .chip-cajon.conocido { background: rgba(60,60,60,.9); }
+  .chip.aviso { border-color: var(--aviso); color: var(--aviso); }
 
   #toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); background: #222; color: #fff; padding: 10px 16px;
     border-radius: 12px; font-size: .9rem; z-index: 20; max-width: 90vw; text-align: center; }
@@ -184,6 +189,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M10 14h4"/></svg>
       Cajón de desparejados <span class="contador" id="numCajon">0</span>
     </button>
+    <button class="boton secundario" id="btnCatalogo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M9 8h6"/></svg>
+      Parejas conocidas <span class="contador" id="numCatalogo">0</span>
+    </button>
   </div>
   <input type="file" id="entradaCamara" accept="image/*" capture="environment" class="oculto">
   <input type="file" id="entradaGaleria" accept="image/*" class="oculto">
@@ -195,12 +204,13 @@
       <li><span class="ic">2</span><span><b>Fondo liso</b>: suelo, manta o sábana. Que se vea bien el dibujo de cada calcetín.</span></li>
       <li><span class="ic">3</span><span><b>Foto desde arriba</b>, con todos dentro y con buena luz. La primera vez tarda más porque carga los modelos.</span></li>
       <li><span class="ic">4</span><span>Si alguno sale mal, pulsa <b>Corregir</b> y toca los dos calcetines que van juntos.</span></li>
-      <li><span class="ic">5</span><span>Al acabar pulsa <b>Hecho</b>: los que se quedan solos van al <b>cajón</b> y la próxima vez se comparan con los nuevos.</span></li>
+      <li><span class="ic">5</span><span>Al acabar pulsa <b>Hecho</b>: los que se quedan solos van al <b>cajón</b> y la próxima vez se comparan con los nuevos. Las parejas se recuerdan en <b>Parejas conocidas</b>, para reconocer un calcetín suelto.</span></li>
     </ul>
   </div>
 
   <div class="pie-links">
     <span id="aprendido"></span>
+    <span id="numCasos"></span>
     <button id="btnExportar">Exportar datos para mejorar</button>
   </div>
   <div class="pie">
@@ -236,6 +246,7 @@
       <button data-nivel="1" class="activo">Normal</button>
       <button data-nivel="2">Flexible</button>
     </div>
+    <button class="chip aviso oculto" id="btnDudosas">Revisar dudosas</button>
     <button class="chip" id="btnCorregir">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>
       Corregir
@@ -258,6 +269,20 @@
   <div class="contenido">
     <div class="rejilla" id="rejillaCajon"></div>
     <div class="vacio oculto" id="cajonVacio">Aquí aparecerán los calcetines que se queden sin pareja cuando pulses <b>Hecho</b>.<br><br>La próxima vez que hagas una foto, la app los comparará con los nuevos y te dirá si ha aparecido su pareja.</div>
+  </div>
+</section>
+
+<!-- =============================== PAREJAS CONOCIDAS =============================== -->
+<section id="catalogoVista" class="oculto">
+  <div class="barra">
+    <button class="icono-btn" id="btnCatalogoVolver" aria-label="Volver">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="titulo"><b>Parejas conocidas</b><span id="catalogoSub"></span></div>
+  </div>
+  <div class="contenido">
+    <div class="rejilla" id="rejillaCatalogo"></div>
+    <div class="vacio oculto" id="catalogoVacio">Aquí aparecerán las parejas que confirmes al pulsar <b>Hecho</b>.<br><br>Cuando un calcetín de una pareja conocida salga solo en una foto, la app te dirá de cuál es y que falta su pareja.</div>
   </div>
 </section>
 
@@ -287,6 +312,12 @@
     mapa: null,         // Int32Array: índice de calcetín + 1 (cuerpo o anillo)
     nFoto: 0,           // calcetines de la foto; los índices >= nFoto son del cajón
     cajon: [],          // calcetines del cajón que han entrado en la comparación (mismo orden)
+    nBase: 0,           // nFoto + calcetines del cajón; a partir de aquí, el catálogo
+    catalogo: [],       // parejas conocidas que han entrado en la comparación (mismo orden)
+    Scat: null,         // parecidos completos (foto + cajón + catálogo); E.analisis.S solo foto + cajón
+    conoce: null,       // Int32Array(nFoto): posición en E.catalogo de la pareja conocida, o -1
+    vetadas: new Set(), // parejas que has dicho que no lo son ("a-b")
+    confirmadas: new Set(), // parejas dudosas que has confirmado ("a-b")
     pareja: null,       // Int32Array(nFoto): pareja de cada calcetín (foto o cajón) o -1
     segura: null,       // Uint8Array(nFoto)
     prediccion: [],     // parejas que propuso el motor (antes de corregir)
@@ -321,10 +352,14 @@
   };
   const nuevoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const indiceCajon = () => Almacen.get('cajon') || [];
+  const indiceCatalogo = () => Almacen.get('catalogo') || [];
+  const preferencias = () => Almacen.get('preferencias') || {};
+  const clavePar = (x, y) => (x < y ? x + '-' + y : y + '-' + x);
   const fechaCorta = (iso) => {
     try { return new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }); } catch (e) { return ''; }
   };
   const nombreCajon = (it) => (it.nombre && it.nombre.trim()) || `Guardado el ${fechaCorta(it.fecha)}`;
+  const nombreCat = (it) => (it.nombre && it.nombre.trim()) || '';
   const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   /* ---------------------------------------------------------- utilidades */
@@ -340,9 +375,11 @@
     $('inicio').classList.toggle('oculto', vista !== 'inicio');
     $('resultado').classList.toggle('oculto', vista !== 'resultado');
     $('cajonVista').classList.toggle('oculto', vista !== 'cajon');
+    $('catalogoVista').classList.toggle('oculto', vista !== 'catalogo');
     if (vista === 'resultado') ajustarVista(true);
     if (vista === 'inicio') refrescarInicio();
     if (vista === 'cajon') pintarCajon();
+    if (vista === 'catalogo') pintarCatalogo();
   }
   function cargando(si, txt) {
     $('cargandoTxt').textContent = txt || 'Buscando parejas…';
@@ -385,6 +422,9 @@
   }
   function refrescarInicio() {
     $('numCajon').textContent = indiceCajon().length;
+    $('numCatalogo').textContent = indiceCatalogo().length;
+    const casos = (Almacen.get('sesiones') || []).filter((x) => x.caso).length;
+    $('numCasos').textContent = casos ? `${casos} ${casos === 1 ? 'caso de prueba guardado' : 'casos de prueba guardados'}.` : '';
     const aj = Almacen.get('ajustes');
     $('aprendido').textContent = aj && aj.parejas
       ? (aj.parejas >= 4
@@ -441,6 +481,25 @@
     return { items: validos, huellas, descriptores };
   }
 
+  // Parejas conocidas que entran en la comparación: como mucho las 150 vistas más recientemente
+  const MAX_CATALOGO = 150;
+  async function cargarCatalogo(aviso) {
+    const indice = indiceCatalogo().slice().sort((p, q) => String(q.ultima || q.fecha).localeCompare(String(p.ultima || p.fecha))).slice(0, MAX_CATALOGO);
+    const items = [];
+    for (const e of indice) {
+      const it = Almacen.get('cat_' + e.id);
+      if (it) items.push(it);
+    }
+    if (!items.length) return { items: [], huellas: [], descriptores: [] };
+    const r = await MotorIA.prepararCajon(items, { aviso });
+    for (const it of r.actualizados) Almacen.set('cat_' + it.id, it);
+    const validos = [], huellas = [], descriptores = [];
+    items.forEach((it, i) => {
+      if (r.huellas[i]) { validos.push(it); huellas.push(r.huellas[i]); descriptores.push(r.descriptores[i] || null); }
+    });
+    return { items: validos, huellas, descriptores };
+  }
+
   function avisoFoto(titulo, texto) {
     abrirModal(titulo, `<div>${texto}</div>
       <div style="font-size:.9rem">Consejos: calcetines extendidos y sin montarse, fondo liso, foto desde arriba y con buena luz.</div>`,
@@ -463,8 +522,9 @@
     E.motor = null;
     E.guardada = false;
     E.corregir = false;
+    E.vetadas = new Set(); E.confirmadas = new Set();
     // suelta el análisis anterior antes de empezar (memoria)
-    E.analisis = null; E.base = null; E.anillos = null; E.mapa = null;
+    E.analisis = null; E.base = null; E.anillos = null; E.mapa = null; E.Scat = null; E.catalogo = [];
     $('btnCorregir').classList.remove('activo');
     if (!$('modal').classList.contains('oculto')) cerrarModal();
     mostrar('inicio');
@@ -484,11 +544,21 @@
       try {
         const aviso = (t) => cargando(true, t);
         const cj = await cargarCajon(aviso);
-        const r = await MotorIA.analizar(img, { aviso, cajon: cj.huellas, cajonDesc: cj.descriptores });
+        const ct = await cargarCatalogo(aviso);
+        const r = await MotorIA.analizar(img, { aviso, cajon: cj.huellas, cajonDesc: cj.descriptores,
+          catalogo: ct.huellas, catalogoDesc: ct.descriptores });
         E.motor = 'ia';
-        E.analisis = r;
         E.nFoto = r.nFoto;
         E.cajon = cj.items;
+        E.catalogo = ct.items;
+        E.nBase = r.nFoto + cj.items.length;
+        // El catálogo solo sirve para reconocer: las parejas se buscan entre la foto y el cajón
+        E.Scat = r.S;
+        if (r.S.length > E.nBase) {
+          r.S = r.S.slice(0, E.nBase).map((f) => f.slice(0, E.nBase));
+          r.P = r.P.slice(0, E.nBase).map((f) => f.slice(0, E.nBase));
+        }
+        E.analisis = r;
         E.base = new ImageData(new Uint8ClampedArray(r.imagen), r.ancho, r.alto);
         E.tiempos = r.tiempos;
       } catch (e) {
@@ -515,6 +585,7 @@
         E.motor = 'clasico';
         E.nFoto = E.analisis.calcetines.length;
         E.cajon = [];
+        E.catalogo = []; E.Scat = null; E.nBase = E.nFoto;
         E.tiempos = { total: Math.round(performance.now() - t0) };
         if (error) toast('Modo básico: ' + (error.message || error));
       } catch (e) {
@@ -524,10 +595,10 @@
         return;
       }
     }
-    if (E.nFoto < 1 || (E.nFoto < 2 && !E.cajon.length)) {
+    if (E.nFoto < 1 || (E.nFoto < 2 && !E.cajon.length && !E.catalogo.length)) {
       cargando(false);
       avisoFoto(E.nFoto ? 'Solo veo un calcetín' : 'No encuentro calcetines',
-        E.nFoto ? 'En la foto solo he encontrado un calcetín y el cajón está vacío, así que no hay con qué compararlo.'
+        E.nFoto ? 'En la foto solo he encontrado un calcetín y no hay nada guardado, así que no hay con qué compararlo.'
           : 'No he encontrado ningún calcetín en la foto.');
       E.motor = null;
       return;
@@ -604,9 +675,17 @@
 
   function emparejarDeNuevo() {
     const n = E.nFoto;
-    let r = { parejas: [] };
+    let r = { parejas: [] }, propuesta = null;
     if (E.motor === 'ia') {
-      if (E.analisis.S.length) r = MotorIA.emparejar(E.analisis.S, umbralActual(), n);
+      if (E.analisis.S.length) {
+        r = MotorIA.emparejar(E.analisis.S, umbralActual(), n);
+        if (E.vetadas.size) { // las parejas que has rechazado no se vuelven a proponer
+          propuesta = r; // lo que propone el motor por sí solo (para saber si has corregido algo)
+          const S = E.analisis.S.map((f) => Float64Array.from(f));
+          for (const k of E.vetadas) { const [a, b] = k.split('-').map(Number); S[a][b] = S[b][a] = -Infinity; }
+          r = MotorIA.emparejar(S, umbralActual(), n);
+        }
+      }
     } else {
       r = Emparejador.emparejar(E.analisis.D, UMBRAL_CLASICO[E.nivel]);
     }
@@ -615,12 +694,38 @@
     for (const p of r.parejas) {
       E.pareja[p.a] = p.b;
       if (p.b < n) E.pareja[p.b] = p.a;
-      E.segura[p.a] = p.segura ? 1 : 0;
+      E.segura[p.a] = p.segura || E.confirmadas.has(clavePar(p.a, p.b)) ? 1 : 0;
       if (p.b < n) E.segura[p.b] = E.segura[p.a];
     }
-    E.prediccion = r.parejas.map((p) => [p.a, p.b, +(p.parecido || 0).toFixed(3)]);
+    E.prediccion = (propuesta || r).parejas.map((p) => [p.a, p.b, +(p.parecido || 0).toFixed(3)]);
+    reconocer();
     E.sel = -1;
     dibujar();
+  }
+
+  // Busca cada calcetín de la foto entre las parejas conocidas (catálogo)
+  function reconocer() {
+    const n = E.nFoto;
+    E.conoce = new Int32Array(n).fill(-1);
+    if (E.motor !== 'ia' || !E.Scat || !E.Scat.length || !E.catalogo.length) return;
+    const T = umbralActual();
+    for (let i = 0; i < n; i++) {
+      let m = T, k = -1;
+      for (let c = 0; c < E.catalogo.length; c++) {
+        const v = E.Scat[i][E.nBase + c];
+        if (v >= m) { m = v; k = c; }
+      }
+      E.conoce[i] = k;
+    }
+  }
+  const parecidoCat = (i) => (E.conoce && E.conoce[i] >= 0 ? E.Scat[i][E.nBase + E.conoce[i]] : -Infinity);
+  // pareja conocida de un calcetín o de su pareja de la foto (la que más se parezca)
+  function conocidaDe(i) {
+    if (!E.conoce) return null;
+    const j = E.pareja[i];
+    let k = E.conoce[i];
+    if (j >= 0 && !delCajon(j) && E.conoce[j] >= 0 && (k < 0 || parecidoCat(j) > parecidoCat(i))) k = E.conoce[j];
+    return k >= 0 ? E.catalogo[k] : null;
   }
 
   // Numera las parejas: num[i] = número de la pareja del calcetín i de la foto (0 = sin pareja)
@@ -713,11 +818,23 @@
       b.onclick = (ev) => { ev.stopPropagation(); E.sel = i; dibujar(); };
       chips.appendChild(b);
     }
+    // calcetines sin pareja que son de una pareja conocida
+    for (let i = 0; i < E.nFoto; i++) {
+      if (E.pareja[i] >= 0 || !E.conoce || E.conoce[i] < 0) continue;
+      const it = E.catalogo[E.conoce[i]];
+      const b = document.createElement('button');
+      b.className = 'chip-cajon conocido';
+      b.innerHTML = `<img src="${it.miniatura}" alt=""><span>Falta su pareja${nombreCat(it) ? ' · ' + esc(nombreCat(it)) : ''}</span>`;
+      b.onclick = (ev) => { ev.stopPropagation(); E.sel = i; dibujar(); };
+      chips.appendChild(b);
+    }
 
     const huerf = E.nFoto - lista.reduce((s, [, j]) => s + (delCajon(j) ? 1 : 2), 0);
     const conCajon = lista.filter(([, j]) => delCajon(j)).length;
     $('resumen').textContent = `${total} ${total === 1 ? 'pareja' : 'parejas'} · ${huerf} sin pareja`;
     const dudosas = lista.filter(([a]) => !E.segura[a]).length;
+    $('btnDudosas').classList.toggle('oculto', !dudosas);
+    $('btnDudosas').textContent = `Revisar ${dudosas === 1 ? 'dudosa' : 'dudosas'} (${dudosas})`;
     const seg = E.tiempos ? ` · ${(E.tiempos.total / 1000).toFixed(1)} s` : '';
     $('subresumen').textContent = `${E.nFoto} calcetines` + (conCajon ? ` · ${conCajon} con el cajón` : '') +
       (dudosas ? ` · ${dudosas} ${dudosas === 1 ? 'dudosa (?)' : 'dudosas (?)'}` : '') +
@@ -745,11 +862,15 @@
     if (i < 0) { info.classList.add('oculto'); return; }
     info.classList.remove('oculto');
     const n = num[i], j = E.pareja[i];
-    if (n && delCajon(j)) {
+    const con = conocidaDe(i);
+    const deQuien = con && nombreCat(con) ? ` · <b>${esc(nombreCat(con))}</b>` : '';
+    if (!n && con) {
+      info.innerHTML = `<span class="punto" style="background:${GRIS}"></span><img src="${con.miniatura}" alt=""><span>Sin pareja en la foto${E.cajon.length ? ' ni en el cajón' : ''}. Es de una pareja conocida${nombreCat(con) ? ': <b>' + esc(nombreCat(con)) + '</b>' : ''}; falta el otro.</span>`;
+    } else if (n && delCajon(j)) {
       const it = itemCajon(j);
       info.innerHTML = `<span class="punto" style="background:${colorDe(n)}"></span><img src="${it.miniatura}" alt=""><span>Su pareja está en el cajón: <b>${esc(nombreCajon(it))}</b>${E.segura[i] ? '' : ' · no estoy seguro'}</span>`;
     } else if (n) {
-      info.innerHTML = `<span class="punto" style="background:${colorDe(n)}"></span><span>Pareja ${n}${E.segura[i] ? '' : ' · no estoy seguro'}</span>`;
+      info.innerHTML = `<span class="punto" style="background:${colorDe(n)}"></span><span>Pareja ${n}${deQuien}${E.segura[i] ? '' : ' · no estoy seguro'}</span>`;
     } else {
       info.innerHTML = `<span class="punto" style="background:${GRIS}"></span><span>Sin pareja en la foto${E.cajon.length ? ' ni en el cajón' : ''}</span>`;
     }
@@ -768,6 +889,7 @@
     dibujar();
   }
   function unir(a, b) {
+    E.vetadas.delete(clavePar(a, b));
     soltar(a);
     if (delCajon(b)) {
       // un calcetín del cajón solo puede tener una pareja
@@ -792,6 +914,51 @@
       b.onclick = () => { cerrarModal(); unir(i, parseInt(b.dataset.j, 10)); };
     }
   }
+
+  /* ---------------------------------------------------------- revisar parejas dudosas */
+  function parejasDudosas() {
+    return numeracion().lista.filter(([a]) => !E.segura[a]);
+  }
+  // Enseña cada pareja dudosa con los dos calcetines lado a lado para confirmarla o rechazarla.
+  // saltadas: parejas que has dejado para luego en esta revisión.
+  function revisarDudosas(saltadas) {
+    saltadas = saltadas || new Set();
+    const pendientes = parejasDudosas().filter(([a, b]) => !saltadas.has(clavePar(a, b)));
+    if (!pendientes.length) {
+      E.sel = -1; dibujar();
+      toast(parejasDudosas().length ? 'Quedan parejas dudosas sin decidir.' : 'No quedan parejas dudosas.');
+      return;
+    }
+    const [a, b] = pendientes[0];
+    const { num } = numeracion();
+    const cal = E.analisis.calcetines;
+    const otro = delCajon(b)
+      ? { img: itemCajon(b).miniatura, pie: 'Del cajón · ' + esc(nombreCajon(itemCajon(b))) }
+      : { img: cal[b].miniatura, pie: 'De la foto' };
+    E.sel = a; dibujar();
+    // el modo básico no tiene miniaturas: se ven resaltados en la foto
+    const lado = cal[a].miniatura && otro.img ? `
+      <div class="lado-a-lado">
+        <figure><img src="${cal[a].miniatura}" alt="">De la foto</figure>
+        <figure><img src="${otro.img}" alt="">${otro.pie}</figure>
+      </div>` : '<div>Son los dos calcetines resaltados en la foto.</div>';
+    abrirModal('¿Son pareja?', `${lado}
+      <div>Pareja <b>${num[a]}</b>: se parecen, pero no estoy seguro${pendientes.length > 1 ? ` (quedan ${pendientes.length})` : ''}.</div>`,
+      [
+        { texto: 'No lo son', clase: 'peligro', accion: () => {
+          E.vetadas.add(clavePar(a, b));
+          soltar(a);
+          revisarDudosas(saltadas);
+        } },
+        { texto: 'No lo sé', accion: () => { saltadas.add(clavePar(a, b)); revisarDudosas(saltadas); } },
+        { texto: 'Sí, son pareja', clase: 'principal', accion: () => {
+          E.confirmadas.add(clavePar(a, b));
+          E.segura[a] = 1; if (!delCajon(b)) E.segura[b] = 1;
+          revisarDudosas(saltadas);
+        } },
+      ], () => { /* al cerrar tocando fuera: se queda como está */ });
+  }
+  $('btnDudosas').onclick = () => { if (E.corregir) $('btnCorregir').onclick(); revisarDudosas(); };
 
   function tocar(ix, iy) {
     const { ancho: W, alto: H } = E.analisis;
@@ -833,7 +1000,7 @@
   $('btnVolver').onclick = () => mostrar('inicio');
   window.onAndroidBack = () => {
     if (!$('modal').classList.contains('oculto')) { cerrarModal(); return true; }
-    if (!$('cajonVista').classList.contains('oculto')) { mostrar('inicio'); return true; }
+    if (!$('cajonVista').classList.contains('oculto') || !$('catalogoVista').classList.contains('oculto')) { mostrar('inicio'); return true; }
     if (!$('resultado').classList.contains('oculto')) {
       if (E.sel >= 0) { E.sel = -1; dibujar(); } else mostrar('inicio');
       return true;
@@ -869,26 +1036,42 @@
     if (E.guardada) { toast('Esta foto ya está guardada.'); return; }
     const r = resumenFinal();
     const puedeCajon = E.motor === 'ia';
+    const pref = preferencias();
+    const dudosas = parejasDudosas().length;
+    const hayParejas = r.lista.length > 0;
     const lineas = [
       `<div>• <b>${r.foto.length}</b> ${r.foto.length === 1 ? 'pareja' : 'parejas'} en la foto</div>`,
       r.cajon.length ? `<div>• <b>${r.cajon.length}</b> con calcetines del cajón (saldrán del cajón)</div>` : '',
       `<div>• <b>${r.solos.length}</b> sin pareja</div>`,
+      dudosas ? `<div>• <b>${dudosas}</b> ${dudosas === 1 ? 'pareja dudosa' : 'parejas dudosas'} sin revisar</div>` : '',
       r.solos.length && puedeCajon ? '<label class="casilla"><input type="checkbox" id="chkCajon" checked> Guardar los que no tienen pareja en el cajón</label>' : '',
-      !puedeCajon ? '<div>En modo básico no se puede usar el cajón.</div>' : '',
+      hayParejas && puedeCajon ? `<label class="casilla"><input type="checkbox" id="chkCatalogo"${pref.catalogo === false ? '' : ' checked'}> Recordar las parejas en «Parejas conocidas»</label>` : '',
+      puedeCajon ? `<label class="casilla"><input type="checkbox" id="chkCaso"${pref.caso ? ' checked' : ''}> Guardar la foto como caso de prueba</label>
+        <div style="font-size:.85rem">Márcalo solo si cada calcetín está bien rodeado y las parejas son las correctas: la foto servirá para medir el acierto de las próximas versiones.</div>` : '',
+      !puedeCajon ? '<div>En modo básico no se pueden usar el cajón ni las parejas conocidas.</div>' : '',
       '<div style="font-size:.85rem">Las parejas que confirmas sirven para que la app se ajuste a tus calcetines.</div>',
     ].join('');
-    abrirModal('Guardar resultado', lineas, [
-      { texto: 'Cancelar' },
-      { texto: 'Guardar', clase: 'principal', accion: () => {}, mantener: true },
-    ]);
+    const acciones = [{ texto: 'Cancelar' }];
+    if (dudosas) acciones.push({ texto: 'Revisar dudosas', accion: () => revisarDudosas() });
+    acciones.push({ texto: 'Guardar', clase: 'principal', accion: () => {}, mantener: true });
+    abrirModal('Guardar resultado', lineas, acciones);
     const btnGuardar = $('modalAcciones').lastChild;
     btnGuardar.onclick = async () => {
-      const alCajon = puedeCajon && r.solos.length && $('chkCajon') && $('chkCajon').checked;
+      const marcada = (id) => !!($(id) && $(id).checked);
+      const alCajon = puedeCajon && r.solos.length && marcada('chkCajon');
+      const alCatalogo = puedeCajon && hayParejas && marcada('chkCatalogo');
+      const caso = puedeCajon && marcada('chkCaso');
+      if (puedeCajon) {
+        const pr = preferencias();
+        if (hayParejas) pr.catalogo = alCatalogo;
+        pr.caso = caso;
+        Almacen.set('preferencias', pr);
+      }
       cerrarModal();
       cargando(true, 'Guardando…');
       await esperarPintado();
       try {
-        const n = guardarSesion(r, alCajon);
+        const n = guardarSesion(r, alCajon, { alCatalogo, caso });
         E.guardada = true;
         aprender();
         cargando(false);
@@ -902,7 +1085,47 @@
     };
   };
 
-  function guardarSesion(r, alCajon) {
+  // Apunta las parejas confirmadas en el catálogo: si ya se conocía, suma una vista; si no, la crea.
+  // Devuelve las parejas nuevas [{ par: [a, b], id }].
+  function actualizarCatalogo(r, fecha, sesion) {
+    const { calcetines } = E.analisis;
+    const S = E.analisis.S, T = umbralActual();
+    let indice = indiceCatalogo();
+    const vistas = new Set(), nuevas = [];
+    for (const [a, b] of r.lista) {
+      const con = conocidaDe(a);
+      if (con) { vistas.add(con.id); continue; }
+      // ¿es igual que otra pareja nueva de esta misma foto? (varios pares del mismo modelo)
+      const repetida = nuevas.find((x) => S.length && (S[a][x.par[0]] >= T || (!delCajon(b) && S[b][x.par[0]] >= T)));
+      if (repetida) { repetida.vistas++; continue; }
+      const cid = nuevoId();
+      const nombre = delCajon(b) ? (itemCajon(b).nombre || '') : '';
+      const it = {
+        id: cid, fecha, ultima: fecha, vistas: 1, nombre, sesion,
+        miniatura: calcetines[a].miniatura,
+        huella: MotorIA.huellaAGuardar(E.analisis.huellas[a]),
+        desc: MotorIA.descAGuardar(E.analisis.descriptores ? E.analisis.descriptores[a] : null),
+        recorte: MotorIA.recorteAGuardar(E.analisis.recortes[a]),
+      };
+      nuevas.push({ par: [a, b], id: cid, vistas: 1, it });
+    }
+    for (const x of nuevas) {
+      x.it.vistas = x.vistas;
+      if (!Almacen.set('cat_' + x.id, x.it)) throw new Error('sin espacio');
+      indice.push({ id: x.id, fecha, ultima: fecha, vistas: x.vistas, nombre: x.it.nombre, miniatura: x.it.miniatura });
+    }
+    for (const e of indice) {
+      if (!vistas.has(e.id)) continue;
+      e.vistas = (e.vistas || 1) + 1; e.ultima = fecha;
+      const it = Almacen.get('cat_' + e.id);
+      if (it) { it.vistas = e.vistas; it.ultima = fecha; Almacen.set('cat_' + e.id, it); }
+    }
+    Almacen.set('catalogo', indice);
+    return nuevas.map((x) => ({ par: x.par, id: x.id }));
+  }
+
+  function guardarSesion(r, alCajon, op) {
+    op = op || {};
     const id = nuevoId(), fecha = new Date().toISOString();
     const { ancho: W, alto: H, calcetines } = E.analisis;
     const redondear = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null);
@@ -923,19 +1146,31 @@
     if (alCajon) {
       for (const i of r.solos) {
         const cid = nuevoId();
+        // si es de una pareja conocida, hereda su nombre
+        const con = E.conoce && E.conoce[i] >= 0 ? E.catalogo[E.conoce[i]] : null;
+        const nombre = con ? nombreCat(con) : '';
         const it = {
-          id: cid, fecha, nombre: '', sesion: id,
+          id: cid, fecha, nombre, sesion: id, catalogo: con ? con.id : null,
           miniatura: calcetines[i].miniatura,
           huella: MotorIA.huellaAGuardar(E.analisis.huellas[i]),
           desc: MotorIA.descAGuardar(E.analisis.descriptores ? E.analisis.descriptores[i] : null),
           recorte: MotorIA.recorteAGuardar(E.analisis.recortes[i]),
         };
         if (!Almacen.set('cal_' + cid, it)) throw new Error('sin espacio');
-        indice.push({ id: cid, fecha, nombre: '', miniatura: it.miniatura });
+        indice.push({ id: cid, fecha, nombre, miniatura: it.miniatura });
         nuevos.push({ i, id: cid });
       }
     }
     Almacen.set('cajon', indice);
+
+    // 2b. las parejas confirmadas se apuntan en el catálogo de parejas conocidas
+    const conocidos = [];
+    if (E.conoce) for (let i = 0; i < E.nFoto; i++) if (E.conoce[i] >= 0) conocidos.push([i, E.catalogo[E.conoce[i]].id]);
+    const alCatalogo = op.alCatalogo && E.motor === 'ia' ? actualizarCatalogo(r, fecha, id) : [];
+
+    // caso de prueba: la foto entera (sin reducir) y si has tenido que corregir algo
+    const predichas = new Set(E.prediccion.map(([a, b]) => clavePar(a, b)));
+    const corregida = final.length !== predichas.size || final.some(([a, b]) => !predichas.has(clavePar(a, b)));
 
     // 3. la sesión (para exportar) y los datos para aprender
     const ses = {
@@ -947,12 +1182,15 @@
         caja: [+(c.x0 / W).toFixed(4), +(c.y0 / H).toFixed(4), +(c.x1 / W).toFixed(4), +(c.y1 / H).toFixed(4)],
       })),
       prediccion: E.prediccion, final, alCajon: nuevos, tiempos: E.tiempos,
-      metrica, S, P, foto: fotoReducida(1600, 0.82),
+      conocidos, alCatalogo, corregida, caso: !!op.caso,
+      metrica, S, P, foto: op.caso ? fotoReducida(4096, 0.92) : fotoReducida(1600, 0.82),
     };
     Almacen.set('ses_' + id, ses);
     if (S) Almacen.set('apr_' + id, { S, nFoto: E.nFoto, final, metrica });
     const sesiones = Almacen.get('sesiones') || [];
-    sesiones.push({ id, fecha, parejas: r.foto.length, cajon: r.cajon.length, alCajon: nuevos.length });
+    const entrada = { id, fecha, parejas: r.foto.length, cajon: r.cajon.length, alCajon: nuevos.length };
+    if (op.caso) entrada.caso = true;
+    sesiones.push(entrada);
     Almacen.set('sesiones', sesiones);
     return nuevos.length;
   }
@@ -1047,10 +1285,68 @@
     };
   }
 
+  /* ---------------------------------------------------------- pantalla de parejas conocidas */
+  $('btnCatalogo').onclick = () => mostrar('catalogo');
+  $('btnCatalogoVolver').onclick = () => mostrar('inicio');
+  const vecesVista = (n) => (n > 1 ? `Vista ${n} veces` : 'Vista 1 vez');
+
+  function pintarCatalogo() {
+    const indice = indiceCatalogo().slice().sort((p, q) => String(q.ultima || q.fecha).localeCompare(String(p.ultima || p.fecha)));
+    $('catalogoSub').textContent = indice.length ? `${indice.length} ${indice.length === 1 ? 'pareja' : 'parejas'}` : '';
+    $('catalogoVacio').classList.toggle('oculto', indice.length > 0);
+    const rej = $('rejillaCatalogo');
+    rej.innerHTML = '';
+    for (const e of indice) {
+      const b = document.createElement('button');
+      b.className = 'ficha';
+      b.innerHTML = `<img src="${e.miniatura}" alt=""><span><b>${esc(e.nombre || 'Sin nombre')}</b>${vecesVista(e.vistas || 1)} · ${fechaCorta(e.ultima || e.fecha)}</span>`;
+      b.onclick = () => editarCatalogo(e.id);
+      rej.appendChild(b);
+    }
+  }
+
+  function renombrarCatalogo(id, nombre) {
+    const ind = indiceCatalogo();
+    const x = ind.find((y) => y.id === id);
+    if (x) x.nombre = nombre;
+    Almacen.set('catalogo', ind);
+    const it = Almacen.get('cat_' + id);
+    if (it) { it.nombre = nombre; Almacen.set('cat_' + id, it); }
+  }
+
+  function borrarDelCatalogo(id) {
+    Almacen.del('cat_' + id);
+    Almacen.set('catalogo', indiceCatalogo().filter((x) => x.id !== id));
+  }
+
+  function editarCatalogo(id) {
+    const e = indiceCatalogo().find((x) => x.id === id);
+    if (!e) return;
+    abrirModal('Pareja conocida',
+      `<img class="ficha-grande" src="${e.miniatura}" alt=""><div>${vecesVista(e.vistas || 1)}. La última, el ${fechaCorta(e.ultima || e.fecha)}.</div>
+       <input type="text" id="nombreCatalogo" maxlength="40" placeholder="Nombre (p. ej. Deadpool, del niño…)" value="${esc(e.nombre || '')}">`,
+      [
+        { texto: 'Borrar', clase: 'peligro', accion: () => {
+          abrirModal('¿Olvidar esta pareja?', 'Sale de las parejas conocidas y ya no se reconocerá un calcetín suyo cuando salga solo.', [
+            { texto: 'Cancelar' },
+            { texto: 'Borrar', clase: 'principal', accion: () => { borrarDelCatalogo(id); pintarCatalogo(); toast('Pareja olvidada.'); } },
+          ]);
+        } },
+        { texto: 'Guardar', clase: 'principal', mantener: true },
+      ]);
+    // Guardar lee el nombre antes de cerrar la ventana
+    $('modalAcciones').lastChild.onclick = () => {
+      const nombre = $('nombreCatalogo').value.trim();
+      cerrarModal();
+      renombrarCatalogo(id, nombre);
+      pintarCatalogo();
+    };
+  }
+
   /* ---------------------------------------------------------- exportar datos */
   $('btnExportar').onclick = () => {
     const n = (Almacen.get('sesiones') || []).length;
-    if (!n && !indiceCajon().length) { toast('Todavía no hay nada guardado. Pulsa Hecho después de analizar una foto.'); return; }
+    if (!n && !indiceCajon().length && !indiceCatalogo().length) { toast('Todavía no hay nada guardado. Pulsa Hecho después de analizar una foto.'); return; }
     if (app && app.exportData) { app.exportData(); return; }
     // navegador: descarga un JSON con lo guardado
     const datos = {};

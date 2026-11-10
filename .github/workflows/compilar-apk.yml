@@ -56,6 +56,23 @@ jobs:
              /tmp/ort/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm "$d/"
           ls -la "$d" app/src/main/assets/modelos
 
+      # Mide el acierto del motor con los mismos modelos que lleva el APK. No impide publicar:
+      # el resultado sale en el resumen de la ejecución.
+      - name: Banco de pruebas del motor con IA
+        continue-on-error: true
+        timeout-minutes: 20
+        run: |
+          pip install --quiet opencv-python-headless numpy
+          npm install --no-save --prefix /tmp/pw playwright@1.63.0
+          export NODE_PATH=/tmp/pw/node_modules
+          python herramientas/casos-control.py --n 2
+          estado=0
+          node herramientas/banco-reales.js herramientas/casos-control || estado=1
+          if ls herramientas/casos-reales/*.json >/dev/null 2>&1; then
+            node herramientas/banco-reales.js herramientas/casos-reales --barrido || estado=1
+          fi
+          exit $estado
+
       - name: Compilar el APK
         env:
           BUILD_NUMBER: ${{ github.run_number }}
@@ -79,7 +96,9 @@ jobs:
           name: Calcetines-1.0.${{ github.run_number }}
           path: Calcetines-*.apk
 
+      # Solo se publica desde main; en otras ramas el APK queda en la ejecución
       - name: Publicar la versión
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

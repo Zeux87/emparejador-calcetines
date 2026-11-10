@@ -751,12 +751,17 @@
    * el resto del cajón). Para cada parche de A se busca su mejor parche en B (en las dos
    * orientaciones de B); se compara con lo que ese parche se parece al resto de calcetines
    * (mediana) y cuentan los CFG.topk trozos más distintivos.
+   *
+   * nBase (opcional): los nBase primeros son la foto y el cajón; los siguientes son las
+   * parejas conocidas del catálogo. El catálogo no cuenta como «resto de calcetines» (no
+   * cambia el parecido entre los de la foto y el cajón) y solo se compara con los de la foto.
    */
-  async function matrizParecidos(huellas, nFoto, aviso) {
+  async function matrizParecidos(huellas, nFoto, aviso, nBase) {
     const ort = ortGlobal();
     const s = sesiones;
     const n = huellas.length;
     if (nFoto == null) nFoto = n;
+    const nB = nBase != null && nBase >= 3 && nBase < n ? nBase : n;
     const offs = new Int32Array(n + 1);
     for (let j = 0; j < n; j++) offs[j + 1] = offs[j] + huellas[j].n0 + huellas[j].n1;
     const M = offs[n];
@@ -770,19 +775,29 @@
       }
     }
     const tBT = new ort.Tensor('float32', BT, [384, M]);
+    // solo las columnas de la foto y el cajón (para las filas que no son de la foto)
+    let tBase = tBT, MB = M;
+    if (nB < n) {
+      MB = offs[nB];
+      const BTb = new Float32Array(384 * MB);
+      for (let d = 0; d < 384; d++) BTb.set(BT.subarray(d * M, d * M + MB), d * MB);
+      tBase = new ort.Tensor('float32', BTb, [384, MB]);
+    }
     const mejor = Array.from({ length: n }, () => new Array(n));
     for (let a = 0; a < n; a++) {
       const h = huellas[a];
       if (!h.n0) continue;
-      if (aviso && n > nFoto && a % 4 === 0) { aviso(`Buscando en el cajón… ${Math.round(100 * a / n)} %`); await pausa(); }
-      const Y = (await s.sim.run({ A: new ort.Tensor('float32', h.f0, [h.n0, 384]), BT: tBT })).Y.data;
-      for (let b = 0; b < n; b++) {
+      if (aviso && n > nFoto && a % 4 === 0) { aviso(`Comparando con lo guardado… ${Math.round(100 * a / n)} %`); await pausa(); }
+      const todo = a < nFoto || nB === n;
+      const Mx = todo ? M : MB, hasta = todo ? n : nB;
+      const Y = (await s.sim.run({ A: new ort.Tensor('float32', h.f0, [h.n0, 384]), BT: todo ? tBT : tBase })).Y.data;
+      for (let b = 0; b < hasta; b++) {
         if (b === a) continue;
         const r = new Float32Array(h.n0);
         const c0 = offs[b], c1 = offs[b + 1];
         for (let p = 0; p < h.n0; p++) {
           let m = -1;
-          const fila = p * M;
+          const fila = p * Mx;
           for (let c = c0; c < c1; c++) if (Y[fila + c] > m) m = Y[fila + c];
           r[p] = m;
         }
@@ -797,11 +812,12 @@
       const ref = new Float64Array(P);
       for (let p = 0; p < P; p++) {
         let k = 0;
-        for (let b = 0; b < n; b++) if (b !== a) tmp[k++] = mejor[a][b][p];
+        for (let b = 0; b < nB; b++) if (b !== a) tmp[k++] = mejor[a][b][p];
         ref[p] = mediana(tmp, k);
       }
       const z = new Float64Array(P);
-      for (let b = 0; b < n; b++) {
+      const hasta = a < nFoto ? n : nB;
+      for (let b = 0; b < hasta; b++) {
         if (b === a) continue;
         for (let p = 0; p < P; p++) z[p] = mejor[a][b][p] - ref[p];
         z.sort();
@@ -863,9 +879,10 @@
 
   /**
    * Analiza una foto (HTMLImageElement / ImageBitmap).
-   * opciones: { aviso, base, cajon: [huellas del cajón] }
+   * opciones: { aviso, base, cajon: [huellas del cajón], cajonDesc, catalogo: [huellas de las
+   *             parejas conocidas], catalogoDesc }
    * Devuelve { ancho, alto, imagen, calcetines[{pix,x0,y0,x1,y1,huella:{etiqueta}, miniatura}],
-   *            huellas, recortes, nFoto, S (foto + cajón), tiempos }
+   *            huellas, recortes, nFoto, nBase (foto + cajón), S (foto + cajón + catálogo), tiempos }
    */
   async function analizar(img, opciones) {
     const op = opciones || {};
@@ -873,6 +890,8 @@
     // calcetines del cajón válidos (con huella), con su descriptor de colores y dibujo
     const cajonDesc = op.cajonDesc || [];
     const cajonOk = (op.cajon || []).map((h, i) => ({ h, d: cajonDesc[i] || null })).filter((x) => x.h);
+    const catDesc = op.catalogoDesc || [];
+    const catOk = (op.catalogo || []).map((h, i) => ({ h, d: catDesc[i] || null })).filter((x) => x.h);
     const t0 = performance.now();
     const s = await cargarModelos(op.base || '', aviso);
     const t1 = performance.now();
@@ -898,18 +917,19 @@
     const huellas = await huellasDino(s, recortes, aviso);
     const descriptores = recortes.map(descriptor);
     const t3 = performance.now();
-    const todas = huellas.concat(cajonOk.map((x) => x.h));
-    const descTodas = descriptores.concat(cajonOk.map((x) => x.d));
+    const nBase = huellas.length + cajonOk.length;
+    const todas = huellas.concat(cajonOk.map((x) => x.h), catOk.map((x) => x.h));
+    const descTodas = descriptores.concat(cajonOk.map((x) => x.d), catOk.map((x) => x.d));
     let S = [], P = [];
     if (calcetines.length >= 2 || (calcetines.length >= 1 && todas.length >= 3)) {
       aviso && aviso('Buscando parejas…');
       await pausa();
-      S = await matrizParecidos(todas, huellas.length, aviso);
+      S = await matrizParecidos(todas, huellas.length, aviso, nBase);
       P = aplicarDiferencias(S, descTodas, huellas.length);
     }
     const t4 = performance.now();
     return {
-      ancho: I2.w, alto: I2.h, imagen: I2.data, calcetines, S, P, huellas, recortes, descriptores, nFoto: huellas.length,
+      ancho: I2.w, alto: I2.h, imagen: I2.data, calcetines, S, P, huellas, recortes, descriptores, nFoto: huellas.length, nBase,
       tiempos: {
         modelos: Math.round(t1 - t0), sam: Math.round(t2 - t1), dino: Math.round(t3 - t2),
         parecidos: Math.round(t4 - t3), total: Math.round(t4 - t0), hilos: s.hilos, puntos: sam.puntos,

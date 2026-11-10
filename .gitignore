@@ -11,3 +11,7 @@ __pycache__/
 app/src/main/assets/modelos/
 app/src/main/assets/ort/
 app/src/main/assets/_*
+
+# Casos de prueba (fotos reales importadas y casos de control generados)
+herramientas/casos-reales/
+herramientas/casos-control/
