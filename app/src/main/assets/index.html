@@ -105,6 +105,21 @@
   .ficha span { display: block; padding: 6px 8px 8px; font-size: .8rem; line-height: 1.25; color: var(--texto-2); }
   .ficha span b { color: var(--texto); font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .vacio { color: var(--texto-2); text-align: center; padding: 40px 20px; line-height: 1.45; }
+  /* selección de varios calcetines del cajón */
+  .ficha { position: relative; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .ficha i.marca { display: none; position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid #fff; background: rgba(0,0,0,.35); place-items: center; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+  .ficha i.marca svg { width: 15px; height: 15px; opacity: 0; }
+  .seleccionando .ficha i.marca { display: grid; }
+  .ficha.elegida { border-color: var(--acento); box-shadow: 0 0 0 2px var(--acento); }
+  .ficha.elegida i.marca { background: var(--acento); border-color: var(--acento); }
+  .ficha.elegida i.marca svg { opacity: 1; }
+  .barra-acciones { display: flex; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: var(--superficie);
+    border-top: 1px solid var(--borde); }
+  .barra-acciones .chip { flex: 1 1 0; justify-content: center; padding: 11px 8px; white-space: nowrap; }
+  .chip.peligro { color: #D32F2F; border-color: #D32F2F; }
+  .chip.peligro.lleno { background: #D32F2F; color: #fff; }
+  .chip:disabled { opacity: .4; }
   .boton .contador { background: var(--superficie-2); color: var(--texto); border-radius: 99px; padding: 2px 9px; font-size: .85rem; }
   .pie-links { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; color: var(--texto-2); font-size: .85rem; }
   .pie-links button { color: var(--acento); font-weight: 600; padding: 6px 0; }
@@ -270,6 +285,7 @@
     <div class="rejilla" id="rejillaCajon"></div>
     <div class="vacio oculto" id="cajonVacio">Aquí aparecerán los calcetines que se queden sin pareja cuando pulses <b>Hecho</b>.<br><br>La próxima vez que hagas una foto, la app los comparará con los nuevos y te dirá si ha aparecido su pareja.</div>
   </div>
+  <div class="barra-acciones oculto" id="accionesCajon"></div>
 </section>
 
 <!-- =============================== PAREJAS CONOCIDAS =============================== -->
@@ -1000,6 +1016,7 @@
   $('btnVolver').onclick = () => mostrar('inicio');
   window.onAndroidBack = () => {
     if (!$('modal').classList.contains('oculto')) { cerrarModal(); return true; }
+    if (!$('cajonVista').classList.contains('oculto') && SelCajon.activo) { salirSeleccionCajon(); return true; }
     if (!$('cajonVista').classList.contains('oculto') || !$('catalogoVista').classList.contains('oculto')) { mostrar('inicio'); return true; }
     if (!$('resultado').classList.contains('oculto')) {
       if (E.sel >= 0) { E.sel = -1; dibujar(); } else mostrar('inicio');
@@ -1229,22 +1246,148 @@
   }
 
   /* ---------------------------------------------------------- pantalla del cajón */
-  $('btnCajon').onclick = () => mostrar('cajon');
-  $('btnCajonVolver').onclick = () => mostrar('inicio');
+  // Selección de varios: con «Seleccionar» o manteniendo pulsada una ficha
+  const SelCajon = { activo: false, ids: new Set() };
+  // sin volver a pintar la rejilla: la ficha que se está pulsando sigue siendo la misma
+  function salirSeleccionCajon() {
+    SelCajon.activo = false;
+    SelCajon.ids.clear();
+    actualizarSeleccionCajon();
+  }
+  function entrarSeleccionCajon(id) {
+    SelCajon.activo = true;
+    SelCajon.ids.clear();
+    if (id) SelCajon.ids.add(id);
+    actualizarSeleccionCajon();
+  }
+
+  $('btnCajon').onclick = () => { SelCajon.activo = false; SelCajon.ids.clear(); mostrar('cajon'); };
+  $('btnCajonVolver').onclick = () => { if (SelCajon.activo) salirSeleccionCajon(); else mostrar('inicio'); };
+
+  const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+  const MARCA = '<i class="marca"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></i>';
 
   function pintarCajon() {
     const indice = indiceCajon().slice().reverse();
-    $('cajonSub').textContent = indice.length ? `${indice.length} ${indice.length === 1 ? 'calcetín' : 'calcetines'} esperando pareja` : '';
+    // quita de la selección lo que ya no está en el cajón
+    const hay = new Set(indice.map((e) => e.id));
+    for (const id of [...SelCajon.ids]) if (!hay.has(id)) SelCajon.ids.delete(id);
+    if (!indice.length) SelCajon.activo = false;
     $('cajonVacio').classList.toggle('oculto', indice.length > 0);
     const rej = $('rejillaCajon');
     rej.innerHTML = '';
     for (const e of indice) {
       const b = document.createElement('button');
       b.className = 'ficha';
-      b.innerHTML = `<img src="${e.miniatura}" alt=""><span><b>${esc(e.nombre || 'Sin nombre')}</b>${fechaCorta(e.fecha)}</span>`;
-      b.onclick = () => editarCajon(e.id);
+      b.dataset.id = e.id;
+      b.innerHTML = `<img src="${e.miniatura}" alt="">${MARCA}<span><b>${esc(e.nombre || 'Sin nombre')}</b>${fechaCorta(e.fecha)}</span>`;
+      pulsacionLarga(b, () => {
+        if (SelCajon.activo) alternarCajon(e.id);
+        else entrarSeleccionCajon(e.id);
+      });
+      b.onclick = () => {
+        if (b.dataset.largo) { delete b.dataset.largo; return; } // ya lo ha hecho la pulsación larga
+        if (SelCajon.activo) alternarCajon(e.id);
+        else editarCajon(e.id);
+      };
       rej.appendChild(b);
     }
+    actualizarSeleccionCajon();
+  }
+
+  // Mantener pulsado ~0,5 s sin mover el dedo
+  function pulsacionLarga(el, fn) {
+    let t = 0, x = 0, y = 0;
+    const cancelar = () => { clearTimeout(t); t = 0; };
+    el.addEventListener('pointerdown', (ev) => {
+      x = ev.clientX; y = ev.clientY;
+      cancelar();
+      delete el.dataset.largo; // por si la vez anterior no llegó el click
+      t = setTimeout(() => {
+        t = 0;
+        el.dataset.largo = '1';
+        if (navigator.vibrate) { try { navigator.vibrate(25); } catch (e) { /* nada */ } }
+        fn();
+      }, 480);
+    });
+    el.addEventListener('pointermove', (ev) => { if (t && Math.hypot(ev.clientX - x, ev.clientY - y) > 10) cancelar(); });
+    el.addEventListener('pointerup', cancelar);
+    el.addEventListener('pointercancel', cancelar);
+    el.addEventListener('pointerleave', cancelar);
+    el.addEventListener('contextmenu', (ev) => ev.preventDefault());
+  }
+
+  function alternarCajon(id) {
+    if (SelCajon.ids.has(id)) SelCajon.ids.delete(id); else SelCajon.ids.add(id);
+    actualizarSeleccionCajon();
+  }
+
+  // Marca las fichas elegidas, el título y la barra de abajo, sin volver a pintar la rejilla
+  function actualizarSeleccionCajon() {
+    const total = indiceCajon().length, n = SelCajon.ids.size;
+    $('cajonVista').classList.toggle('seleccionando', SelCajon.activo);
+    for (const b of $('rejillaCajon').children) b.classList.toggle('elegida', SelCajon.activo && SelCajon.ids.has(b.dataset.id));
+    $('cajonSub').textContent = SelCajon.activo
+      ? (n ? plural(n, 'seleccionado', 'seleccionados') : 'Toca los calcetines que quieras borrar')
+      : (total ? `${plural(total, 'calcetín', 'calcetines')} esperando pareja` : '');
+    const barra = $('accionesCajon');
+    barra.classList.toggle('oculto', !total);
+    barra.innerHTML = '';
+    const boton = (texto, clase, fn, desactivado) => {
+      const b = document.createElement('button');
+      b.className = 'chip' + (clase ? ' ' + clase : '');
+      b.textContent = texto;
+      b.disabled = !!desactivado;
+      b.onclick = fn;
+      barra.appendChild(b);
+    };
+    if (!total) return;
+    if (SelCajon.activo) {
+      boton('Cancelar', '', salirSeleccionCajon);
+      const todos = n === total;
+      boton(todos ? 'Ninguno' : 'Todos', '', () => {
+        if (todos) SelCajon.ids.clear();
+        else for (const e of indiceCajon()) SelCajon.ids.add(e.id);
+        actualizarSeleccionCajon();
+      });
+      boton(n ? `Borrar (${n})` : 'Borrar', 'peligro lleno', borrarSeleccionCajon, !n);
+    } else {
+      boton('Seleccionar', '', () => entrarSeleccionCajon());
+      boton('Vaciar cajón', 'peligro', vaciarCajon);
+    }
+  }
+
+  function borrarSeleccionCajon() {
+    const ids = [...SelCajon.ids];
+    if (!ids.length) return;
+    const n = ids.length;
+    abrirModal(n === 1 ? '¿Borrar este calcetín?' : `¿Borrar ${n} calcetines?`,
+      `<div>${n === 1 ? 'Sale del cajón y ya no se comparará' : 'Salen del cajón y ya no se compararán'} con los nuevos.</div>
+       <div style="font-size:.9rem">Útil si ya les has encontrado pareja sin la app. No se puede deshacer.</div>`, [
+        { texto: 'Cancelar' },
+        { texto: 'Borrar', clase: 'principal', accion: () => {
+          borrarVariosDelCajon(ids);
+          SelCajon.activo = false; SelCajon.ids.clear();
+          pintarCajon();
+          toast(n === 1 ? 'Borrado del cajón.' : `${n} calcetines borrados del cajón.`);
+        } },
+      ]);
+  }
+
+  function vaciarCajon() {
+    const n = indiceCajon().length;
+    if (!n) return;
+    abrirModal('¿Vaciar el cajón?',
+      `<div>Se ${n === 1 ? 'borra el calcetín' : `borran los <b>${n}</b> calcetines`} del cajón y ya no se compararán con los nuevos.</div>
+       <div style="font-size:.9rem">Las parejas conocidas no se tocan. No se puede deshacer.</div>`, [
+        { texto: 'Cancelar' },
+        { texto: 'Vaciar', clase: 'principal', accion: () => {
+          borrarVariosDelCajon(indiceCajon().map((e) => e.id));
+          SelCajon.activo = false; SelCajon.ids.clear();
+          pintarCajon();
+          toast('Cajón vaciado.');
+        } },
+      ]);
   }
 
   function renombrarCajon(id, nombre) {
@@ -1257,8 +1400,13 @@
   }
 
   function borrarDelCajon(id) {
-    Almacen.del('cal_' + id);
-    Almacen.set('cajon', indiceCajon().filter((x) => x.id !== id));
+    borrarVariosDelCajon([id]);
+  }
+
+  function borrarVariosDelCajon(ids) {
+    const fuera = new Set(ids);
+    for (const id of fuera) Almacen.del('cal_' + id);
+    Almacen.set('cajon', indiceCajon().filter((x) => !fuera.has(x.id)));
   }
 
   function editarCajon(id) {
