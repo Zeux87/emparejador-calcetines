@@ -21,7 +21,7 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 - **Dónde hay calcetines**: además del color, se usa el propio mapa de SlimSAM: cada zona de la foto se compara con lo que tiene alrededor. El suelo se parece a su entorno y un calcetín no, así que encuentra calcetines blancos sobre baldosa clara y no se confunde con las juntas de las baldosas o de las tablas.
 - **Calcetines de dos colores** (pie azul y caña blanca, puntera de otro color): se quedan en una sola pieza. Una máscara solo se divide en dos si cada parte tiene tamaño de calcetín.
 - **DINOv2** (modelo de visión) saca la huella de cada trozo del dibujo del calcetín. Para comparar dos calcetines se mira, frente al resto de calcetines de la foto, el 25 % de trozos que mejor encajan (logos, rayas, tramas) y qué parte del calcetín entero encaja. Así cuenta el dibujo y no la forma con la que ha caído, y dos calcetines que solo comparten un detalle (el mismo logo o la misma puntera) no salen parecidos.
-- **Diferencias generales**: al parecido de DINOv2 se le resta cuando los calcetines se diferencian a simple vista: colores que uno tiene y el otro no (un gris liso frente a uno gris con franjas rojas) y distinta cantidad de dibujo (liso frente a rombos, rayas o tramas).
+- **Diferencias generales**: al parecido de DINOv2 se le resta cuando los calcetines se diferencian a simple vista: colores que uno tiene y el otro no (un gris liso frente a uno gris con franjas rojas) y distinta cantidad de dibujo (liso frente a rombos, rayas o tramas). Dentro de la misma foto también cuenta el tamaño: un calcetín liso negro de niño y uno de adulto no se emparejan.
 - Dos calcetines son pareja si cada uno es el más parecido del otro y el parecido supera el umbral.
 - Si Android cierra la app mientras la cámara está abierta (pasa por falta de memoria), al volver la foto se recupera y se analiza igualmente. Si el análisis se queda sin memoria, la app se vuelve a abrir y lo avisa. Si no hay ninguno claro, se quedan sin pareja (**✕**); las parejas justas llevan **?**.
 - Si el motor de IA no puede arrancar, la app usa el motor básico anterior (colores y formas) y lo indica.
@@ -66,7 +66,7 @@ node herramientas/banco-reales.js --barrido
 
 Los casos se guardan en `herramientas/casos-reales/`, que **no se sube** al repositorio (son fotos de tu casa y el repositorio es público). Si se suben, el flujo de compilación pasa el banco con ellos en cada versión.
 
-El flujo de compilación pasa siempre el banco con unos casos sintéticos de control (`herramientas/casos-control.py`), para comprobar que el motor arranca y empareja de principio a fin. Son dibujos planos, no fotos: el motor acierta 29 de sus 36 parejas y el paso avisa si baja de 26. El resultado sale en el resumen de la ejecución y no impide publicar.
+El flujo de compilación pasa siempre el banco con unos casos sintéticos de control (`herramientas/casos-control.py`), para comprobar que el motor arranca y empareja de principio a fin. Son dibujos planos, no fotos: el motor acierta 32 de sus 36 parejas, sin ninguna falsa, y el paso avisa si baja de 28. El resultado sale en el resumen de la ejecución y no impide publicar.
 
 ## Banco de escenas con calcetines reales
 

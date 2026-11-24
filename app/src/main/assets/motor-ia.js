@@ -62,6 +62,10 @@
     dibujoPeso: 1.4,
     dibujoBorde: 12,      // ΔE entre píxeles vecinos a partir del cual hay un borde de dibujo (las arrugas no llegan)
     penalMax: 0.6,
+    // Tamaño (solo dentro de la misma foto, donde la escala es la misma): un calcetín de niño
+    // y uno de adulto lisos del mismo color se parecen en todo menos en el tamaño.
+    tamTol: 0.55,         // proporción de superficie (pequeño/grande) tolerada (uno más arrugado que otro…)
+    tamPeso: 1.0,
   };
   const MEDIA = [0.485, 0.456, 0.406], DESV = [0.229, 0.224, 0.225];
   const FONDO = [104, 116, 124]; // gris neutro (RGB) detrás de cada recorte
@@ -692,13 +696,18 @@
     return s;
   }
 
-  /** Cuánto parecido se quita a la pareja (a, b) por diferencias de colores y de dibujo. */
+  /** Cuánto parecido se quita a la pareja (a, b) por diferencias de colores, de dibujo y de tamaño. */
   function penalizacion(da, db, cruzada) {
     if (!da || !db) return 0;
     const falta = Math.max(colorQueFalta(da, db), colorQueFalta(db, da));
     const pc = CFG.colorPeso * Math.max(0, falta - (cruzada ? CFG.colorTolCajon : CFG.colorTol));
     const pd = CFG.dibujoPeso * Math.max(0, Math.abs(da.dibujo - db.dibujo) - CFG.dibujoTol);
-    return Math.min(CFG.penalMax, pc + pd);
+    let pt = 0;
+    if (!cruzada && da.area && db.area) {
+      const r = Math.min(da.area, db.area) / Math.max(da.area, db.area);
+      pt = CFG.tamPeso * Math.max(0, CFG.tamTol - r);
+    }
+    return Math.min(CFG.penalMax, pc + pd + pt);
   }
 
   // Resta las penalizaciones a la matriz de parecidos; devuelve la matriz de penalizaciones
@@ -1029,6 +1038,8 @@
     }
     const huellas = await huellasDino(s, recortes, aviso);
     const descriptores = recortes.map(descriptor);
+    // superficie de cada calcetín en la foto (para comparar tamaños dentro de la misma foto)
+    descriptores.forEach((d, i) => { if (d) d.area = calcetines[i].pix.length; });
     const t3 = performance.now();
     const nBase = huellas.length + cajonOk.length;
     const todas = huellas.concat(cajonOk.map((x) => x.h), catOk.map((x) => x.h));
