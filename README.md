@@ -18,7 +18,9 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 
 - Hace la foto con la cámara o la coge de la galería. Todo se procesa en el móvil, sin conexión (unos 10-25 s; la primera vez algo más porque carga los modelos).
 - **SlimSAM** (modelo de segmentación) recorta cada calcetín por separado, aunque estén arrugados o se toquen.
-- **DINOv2** (modelo de visión) saca la huella de cada trozo del dibujo del calcetín. Para comparar dos calcetines se miran los 20 trozos más distintivos (logos, rayas, tramas) frente al resto de calcetines de la foto, así que cuenta el dibujo y no la forma con la que ha caído.
+- **Dónde hay calcetines**: además del color, se usa el propio mapa de SlimSAM: cada zona de la foto se compara con lo que tiene alrededor. El suelo se parece a su entorno y un calcetín no, así que encuentra calcetines blancos sobre baldosa clara y no se confunde con las juntas de las baldosas o de las tablas.
+- **Calcetines de dos colores** (pie azul y caña blanca, puntera de otro color): se quedan en una sola pieza. Una máscara solo se divide en dos si cada parte tiene tamaño de calcetín.
+- **DINOv2** (modelo de visión) saca la huella de cada trozo del dibujo del calcetín. Para comparar dos calcetines se mira, frente al resto de calcetines de la foto, el 25 % de trozos que mejor encajan (logos, rayas, tramas) y qué parte del calcetín entero encaja. Así cuenta el dibujo y no la forma con la que ha caído, y dos calcetines que solo comparten un detalle (el mismo logo o la misma puntera) no salen parecidos.
 - **Diferencias generales**: al parecido de DINOv2 se le resta cuando los calcetines se diferencian a simple vista: colores que uno tiene y el otro no (un gris liso frente a uno gris con franjas rojas) y distinta cantidad de dibujo (liso frente a rombos, rayas o tramas).
 - Dos calcetines son pareja si cada uno es el más parecido del otro y el parecido supera el umbral.
 - Si Android cierra la app mientras la cámara está abierta (pasa por falta de memoria), al volver la foto se recupera y se analiza igualmente. Si el análisis se queda sin memoria, la app se vuelve a abrir y lo avisa. Si no hay ninguno claro, se quedan sin pareja (**✕**); las parejas justas llevan **?**.
@@ -27,7 +29,7 @@ Cada vez que se sube un cambio a `main`, GitHub compila el APK solo. Lo encontra
 - **Parejas conocidas**: al pulsar **Hecho**, cada pareja confirmada se recuerda en el móvil (miniatura y huella de uno de los dos calcetines). Si más adelante un calcetín de una pareja conocida sale solo en una foto, la app lo reconoce, enseña de cuál es y avisa de que falta el otro; si va al cajón, hereda el nombre. Una pareja que ya se conocía no se duplica: suma una vista. Desde la pantalla **Parejas conocidas** se les puede poner nombre o borrarlas. Las parejas conocidas solo sirven para reconocer: no cambian qué calcetines de la foto se emparejan.
 - **Revisar dudosas**: las parejas justas (con **?**) se revisan una a una con los dos calcetines lado a lado: **Sí, son pareja**, **No lo son** o **No lo sé**. Una pareja rechazada no se vuelve a proponer en esa foto, y lo que decidas cuenta para el ajuste del umbral.
 - **Casos de prueba**: al pulsar **Hecho** se puede marcar «Guardar la foto como caso de prueba». La foto entera y las parejas dadas por buenas se guardan para medir el acierto del motor con fotos reales (ver «Banco de pruebas con fotos reales»).
-- **Aprende de tus correcciones**: cada vez que pulsas **Hecho** se guardan las parejas confirmadas (con tus correcciones). A partir de 4 parejas confirmadas, la app ajusta el umbral de parecido al que mejor habría acertado con tus calcetines.
+- **Aprende de tus correcciones**: cada vez que pulsas **Hecho** se guardan las parejas confirmadas (con tus correcciones). A partir de 4 parejas confirmadas, la app ajusta el umbral de parecido al que mejor habría acertado con tus calcetines; una pareja falsa cuenta doble que una que no vio. Cuando cambia la forma de medir el parecido, el ajuste vuelve a empezar (las fotos anteriores tienen otra escala).
 - **Exportar datos para mejorar**: genera un JSON con las fotos guardadas, las parejas confirmadas y el cajón, para compartirlo y ajustar el motor con fotos reales.
 - **Exigencia** (Estricta / Normal / Flexible): cuánto se tienen que parecer dos calcetines para emparejarlos.
 - **Corregir**: toca un calcetín y luego su pareja; o selecciónalo y pulsa **Separar**.
@@ -64,7 +66,31 @@ node herramientas/banco-reales.js --barrido
 
 Los casos se guardan en `herramientas/casos-reales/`, que **no se sube** al repositorio (son fotos de tu casa y el repositorio es público). Si se suben, el flujo de compilación pasa el banco con ellos en cada versión.
 
-El flujo de compilación pasa siempre el banco con unos casos sintéticos de control (`herramientas/casos-control.py`), para comprobar que el motor arranca y empareja de principio a fin. Son dibujos planos, no fotos: el motor acierta 20 de sus 36 parejas y el paso avisa si baja de 18. El resultado sale en el resumen de la ejecución y no impide publicar.
+El flujo de compilación pasa siempre el banco con unos casos sintéticos de control (`herramientas/casos-control.py`), para comprobar que el motor arranca y empareja de principio a fin. Son dibujos planos, no fotos: el motor acierta 29 de sus 36 parejas y el paso avisa si baja de 26. El resultado sale en el resumen de la ejecución y no impide publicar.
+
+## Banco de escenas con calcetines reales
+
+`herramientas/escenas.py` monta fotos de prueba con recortes de calcetines de verdad (una carpeta por pareja, con fondo negro) sobre suelos de madera, sábana, baldosa o alfombra, con sombras, luz desigual, calcetines que se tocan o se montan y muchos blancos u oscuros parecidos. Guarda también el mapa de qué píxel es de qué calcetín, y `herramientas/evaluar-escenas.js` mide, con los mismos modelos que el APK, el recorte (calcetines perdidos, unidos, partidos o suelo tomado por calcetín) y las parejas:
+
+```
+pip install opencv-python numpy
+python herramientas/escenas.py --recortes <carpeta de recortes> --n 16 --semilla 1 -o herramientas/escenas
+npm install --no-save playwright
+node herramientas/evaluar-escenas.js herramientas/escenas
+```
+
+Los recortes no están en el repositorio. Con 64 escenas (910 calcetines, 421 parejas; cada calcetín de una pareja fotografiado por separado, así que son más difíciles que una foto real), la versión 1.0.10 frente a la 1.0.9:
+
+| | 1.0.9 | 1.0.10 |
+|---|---|---|
+| Calcetines perdidos | 113 | 6 |
+| Calcetines partidos | 22 | 3 |
+| Calcetines unidos | 3 | 2 |
+| Parejas acertadas (umbral por defecto) | 120 | 222 |
+| Parejas falsas (umbral por defecto) | 0 | 0 |
+| Parejas acertadas con 3 falsas como mucho (mejor umbral) | 165 | 245 |
+
+Casi todos los perdidos de la 1.0.9 eran calcetines claros sobre baldosa clara o con juntas marcadas.
 
 ## Banco de pruebas (motor básico)
 

@@ -431,7 +431,8 @@
   /* ---------------------------------------------------------- inicio */
   function umbralBase() {
     const aj = Almacen.get('ajustes');
-    return aj && aj.umbral != null && aj.parejas >= 4 ? aj.umbral : MotorIA.CFG.umbralBase;
+    // un ajuste hecho con otra forma de medir el parecido no vale: la escala es distinta
+    return aj && aj.umbral != null && aj.parejas >= 4 && aj.metrica === MotorIA.METRICA ? aj.umbral : MotorIA.CFG.umbralBase;
   }
   function umbralActual() {
     return umbralBase() + MotorIA.CFG.ajusteNivel[E.nivel];
@@ -441,7 +442,8 @@
     $('numCatalogo').textContent = indiceCatalogo().length;
     const casos = (Almacen.get('sesiones') || []).filter((x) => x.caso).length;
     $('numCasos').textContent = casos ? `${casos} ${casos === 1 ? 'caso de prueba guardado' : 'casos de prueba guardados'}.` : '';
-    const aj = Almacen.get('ajustes');
+    const aj0 = Almacen.get('ajustes');
+    const aj = aj0 && aj0.metrica === MotorIA.METRICA ? aj0 : null;
     $('aprendido').textContent = aj && aj.parejas
       ? (aj.parejas >= 4
         ? `Ajustado con ${aj.parejas} parejas confirmadas.`
@@ -1213,9 +1215,10 @@
   }
 
   /* ---------------------------------------------------------- aprender de tus parejas confirmadas */
-  // Busca el umbral con el que el motor habría acertado más parejas de las que has confirmado
-  // Las fotos guardadas con la forma de medir anterior (sin colores ni dibujo) solo se usan
-  // mientras no haya al menos 4 parejas confirmadas con la forma actual.
+  // Busca el umbral con el que el motor habría acertado más parejas de las que has confirmado.
+  // Solo cuentan las fotos medidas con la forma actual de calcular el parecido (con otra, la
+  // escala es distinta). Una pareja que no era cuenta doble que una que no vio: deshacer una
+  // pareja falsa cuesta más que juntar dos calcetines a mano.
   function aprender() {
     const sesiones = (Almacen.get('sesiones') || []).slice(-40);
     const todos = [];
@@ -1227,22 +1230,22 @@
       todos.push({ S, nFoto: a.nFoto, final: new Set(a.final.map(([x, y]) => clave(x, y))), clave,
         n: a.final.length, actual: a.metrica === MotorIA.METRICA });
     }
-    const actuales = todos.filter((d) => d.actual);
-    const datos = actuales.reduce((s, d) => s + d.n, 0) >= 4 ? actuales : todos;
+    const datos = todos.filter((d) => d.actual);
     const confirmadas = datos.reduce((s, d) => s + d.n, 0);
-    let mejorT = MotorIA.CFG.umbralBase, mejorErr = Infinity;
-    for (let T = 0.15; T <= 0.40001; T += 0.005) {
+    const base = MotorIA.CFG.umbralBase;
+    let mejorT = base, mejorErr = Infinity;
+    for (let T = base - 0.1; T <= base + 0.15001; T += 0.005) {
       let err = 0;
       for (const d of datos) {
         const pred = MotorIA.emparejar(d.S, T, d.nFoto).parejas.map((p) => d.clave(p.a, p.b));
         const ps = new Set(pred);
-        for (const k of pred) if (!d.final.has(k)) err++;      // pareja que no era
+        for (const k of pred) if (!d.final.has(k)) err += 2;   // pareja que no era
         for (const k of d.final) if (!ps.has(k)) err++;        // pareja que no vio
       }
       const dist = Math.abs(T - MotorIA.CFG.umbralBase), distMejor = Math.abs(mejorT - MotorIA.CFG.umbralBase);
       if (err < mejorErr || (err === mejorErr && dist < distMejor)) { mejorErr = err; mejorT = T; }
     }
-    Almacen.set('ajustes', { umbral: +mejorT.toFixed(3), parejas: confirmadas, sesiones: datos.length, errores: mejorErr });
+    Almacen.set('ajustes', { umbral: +mejorT.toFixed(3), parejas: confirmadas, sesiones: datos.length, errores: mejorErr, metrica: MotorIA.METRICA });
   }
 
   /* ---------------------------------------------------------- pantalla del cajón */

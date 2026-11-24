@@ -10,7 +10,7 @@
  *
  *   carpeta     por defecto herramientas/casos-reales (créala con importar-casos.js)
  *   --umbral    umbral de parecido (por defecto, el del motor)
- *   --barrido   además, enseña los fallos con cada umbral entre 0,15 y 0,40
+ *   --barrido   además, enseña los fallos con cada umbral entre 0,10 y 0,40
  *   --minimo N  da el banco por bueno si acierta al menos N parejas (para los casos de
  *               control sintéticos, que el motor no acierta enteros)
  *
@@ -208,7 +208,7 @@ async function principal() {
   let tabla = '';
   if (barrido && guardados.length) {
     tabla = '\numbral  mal  no vistas\n';
-    for (let T = 0.15; T <= 0.40001; T += 0.01) {
+    for (let T = 0.10; T <= 0.40001; T += 0.01) {
       let mal = 0, perd = 0;
       for (const g of guardados) {
         const r = evaluar(g.caso, g.det, g.S.length ? M.emparejar(g.S, T, g.n).parejas.map((p) => [p.a, p.b]) : []);

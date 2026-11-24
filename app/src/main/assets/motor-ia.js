@@ -7,8 +7,10 @@
  *   3. Cada calcetín se endereza, se "pliega" en un cuadrado y DINOv2 saca la huella
  *      de cada trozo de su dibujo (parches de 14x14 píxeles).
  *   4. Parecido entre dos calcetines: para cada trozo de A se busca el más parecido
- *      en B y se compara con lo que se parece al resto de calcetines de la foto;
- *      cuentan los 20 trozos más distintivos (logos, rayas…), no la forma.
+ *      en B y se compara con lo que se parece al resto de calcetines de la foto.
+ *      Cuenta el 25 % de trozos que mejor encajan (logos, rayas…) y, además, qué parte
+ *      del calcetín entero encaja: dos calcetines que solo comparten un detalle (el mismo
+ *      logo, la misma puntera) y en lo demás son distintos no salen parecidos.
  *      Después se resta parecido por diferencias generales que DINOv2 no castiga:
  *      colores que uno tiene y el otro no (franjas, rombos de otro color) y diferente
  *      cantidad de dibujo (liso frente a rayas, rombos o tramas).
@@ -30,13 +32,28 @@
     areaMin: 0.0015, areaMax: 0.08,
     estabilidadMin: 0.85, iouMin: 0.75, dentroMin: 0.6, solape: 0.3,
     cobertura: 0.6,       // parche válido si el calcetín cubre más del 60 %
-    topk: 20,             // nº de trozos más distintivos que cuentan
-    umbralBase: 0.27,     // umbral de parecido por defecto (Normal); se ajusta con tus parejas confirmadas
+    topFrac: 0.25,        // parte de los trozos que mejor encajan que cuenta para el parecido
+    cobDelta: 0.1,        // un trozo "encaja" si se parece a B esto más que al resto de calcetines
+    cobPeso: 0.4,         // peso de la parte del calcetín que encaja (cobertura)…
+    cobCentro: 0.5,       // …respecto a la mitad: suma si encaja más de la mitad, resta si menos
+    umbralBase: 0.22,     // umbral de parecido por defecto (Normal); se ajusta con tus parejas confirmadas
     ajusteNivel: [0.05, 0, -0.04], // Estricta, Normal, Flexible respecto al umbral base
     margenSegura: 0.04,
     difColorDividir: 12,  // ΔE mínima entre partes para separar una máscara mezclada
     parteMin: 0.2,        // máscara menor que el 20 % de un calcetín típico = un trozo
+    parteDividir: 0.55,   // al dividir una máscara, cada parte tiene que ser al menos así de un calcetín típico
+    dobleDividir: 1.6,    // máscara así de grande respecto a un calcetín típico: pueden ser dos aunque sean del mismo color
+    unoMax: 1.3,          // máscara hasta este tamaño respecto a un calcetín típico: es un calcetín (aunque tenga dos colores)
     bordeMax: 6,          // píxeles de máscara (a 1/4) tocando el borde: más es un mueble cortado
+    // Objetividad: cada celda de 16x16 px del mapa de SlimSAM se compara con su entorno (anillo de
+    // 6 a 10 celdas). El suelo se parece a lo que tiene alrededor; un calcetín, no. Encuentra
+    // calcetines que el color no separa del suelo (blancos sobre baldosa clara) y no se deja
+    // engañar por juntas de baldosas ni de tablas.
+    objR0: 6, objR1: 10,
+    objCuantil: 0.75,     // parecido que alcanza el 25 % más parecido del entorno
+    objUmbral: 0.36,      // 1 - ese parecido: por encima, la celda es objeto
+    objMinCeldas: 3,      // manchas de menos celdas: motas del suelo
+    semillaArea: 2500,    // un punto de consulta por cada tantos px de mancha (mínimo maxPorMancha)
     // Diferencias generales (se restan al parecido de DINOv2):
     colorTol: 0.06,       // parte del calcetín de un color que el otro no tiene, tolerada (talón escondido…)
     colorTolCajon: 0.14,  // más tolerancia con el cajón: otra foto, otra luz
@@ -113,8 +130,9 @@
       if (c.pix.length < 0.001 * w * h) continue;
       const orden = Array.from(c.pix).filter((p) => d2[p] >= 9).sort((a, b) => d2[b] - d2[a]);
       const elegidos = [];
+      const limite = Math.max(CFG.maxPorMancha, Math.ceil(c.pix.length / CFG.semillaArea));
       for (const p of orden) {
-        if (elegidos.length >= CFG.maxPorMancha) break;
+        if (elegidos.length >= limite) break;
         const x = p % w, y = (p / w) | 0;
         if (x < 6 || y < 6 || x >= w - 6 || y >= h - 6) continue;
         if (elegidos.every((q) => (q.x - x) ** 2 + (q.y - y) ** 2 >= esp2)) elegidos.push({ x, y, d: d2[p] });
@@ -126,6 +144,67 @@
   }
 
   /* ------------------------------------------------------------ 2. SlimSAM */
+
+  /**
+   * Objetividad de cada celda (16x16 px de la imagen a 1024) a partir del mapa de SlimSAM
+   * (256 x 64 x 64): 1 - el parecido que alcanza el 25 % más parecido de su entorno.
+   */
+  function objetividad(e, hc, wc) {
+    const C = 256, n = hc * wc;
+    const F = new Float32Array(n * C);
+    for (let y = 0; y < hc; y++) {
+      for (let x = 0; x < wc; x++) {
+        const o = (y * wc + x) * C;
+        let nn = 0;
+        for (let c = 0; c < C; c++) { const v = e[c * 4096 + y * 64 + x]; F[o + c] = v; nn += v * v; }
+        nn = 1 / Math.sqrt(nn || 1);
+        for (let c = 0; c < C; c++) F[o + c] *= nn;
+      }
+    }
+    const offs = [];
+    const r0 = CFG.objR0 * CFG.objR0, r1 = CFG.objR1 * CFG.objR1;
+    for (let dy = -CFG.objR1; dy <= CFG.objR1; dy++) for (let dx = -CFG.objR1; dx <= CFG.objR1; dx++) {
+      const d = dy * dy + dx * dx;
+      if (d >= r0 && d <= r1) offs.push([dy, dx]);
+    }
+    const res = new Float32Array(n), sims = new Float32Array(offs.length);
+    for (let y = 0; y < hc; y++) {
+      for (let x = 0; x < wc; x++) {
+        const o = (y * wc + x) * C;
+        let k = 0;
+        for (const [dy, dx] of offs) {
+          const yy = y + dy, xx = x + dx;
+          if (yy < 0 || xx < 0 || yy >= hc || xx >= wc) continue;
+          const q = (yy * wc + xx) * C;
+          let s = 0;
+          for (let c = 0; c < C; c++) s += F[o + c] * F[q + c];
+          sims[k++] = s;
+        }
+        if (!k) continue;
+        const v = sims.subarray(0, k).sort();
+        // cuantil con interpolación lineal (como numpy)
+        const pos = CFG.objCuantil * (k - 1), i0 = Math.floor(pos), i1 = Math.min(k - 1, i0 + 1);
+        res[y * wc + x] = 1 - (v[i0] + (v[i1] - v[i0]) * (pos - i0));
+      }
+    }
+    return res;
+  }
+
+  // Primer plano = el del color (emparejador.js) + las celdas con objetividad alta
+  function unirPrimerPlano(fg, w, h, obj, hc, wc) {
+    const E = global.Emparejador;
+    const m = new Uint8Array(hc * wc);
+    for (let i = 0; i < m.length; i++) m[i] = obj[i] > CFG.objUmbral ? 1 : 0;
+    const res = Uint8Array.from(fg);
+    for (const c of E.etiquetar(m, wc, hc)) {
+      if (c.pix.length < CFG.objMinCeldas) continue;
+      for (const q of c.pix) {
+        const cx = (q % wc) * 16, cy = ((q / wc) | 0) * 16;
+        for (let y = cy; y < Math.min(h, cy + 16); y++) for (let x = cx; x < Math.min(w, cx + 16); x++) res[y * w + x] = 1;
+      }
+    }
+    return res;
+  }
 
   async function recortarConSam(s, I1, fg, lab1, aviso) {
     const ort = ortGlobal();
@@ -144,6 +223,8 @@
     await pausa();
     const enc = await s.enc.run({ pixel_values: new ort.Tensor('float32', x, [1, 3, 1024, 1024]) });
     const emb = enc.image_embeddings, pos = enc.image_positional_embeddings;
+    const obj = objetividad(emb.data, Math.ceil(h / 16), Math.ceil(w / 16));
+    fg = unirPrimerPlano(fg, w, h, obj, Math.ceil(h / 16), Math.ceil(w / 16));
 
     const hh = Math.ceil(h / 4), ww = Math.ceil(w / 4);
     // primer plano a la resolución de las máscaras (vecino más próximo)
@@ -218,7 +299,7 @@
       }
       if (ok) aceptadas.push(c);
     }
-    const final = dividirMezclas(aceptadas, cands, labLo(lab1, w, h, hh, ww), hh * ww);
+    const final = dividirMezclas(unirTrozos(aceptadas, cands), cands, labLo(lab1, w, h, hh, ww), hh * ww);
     return { mascaras: final, hh, ww, puntos: puntos.length };
   }
 
@@ -248,10 +329,38 @@
     return s;
   }
 
+  // Un calcetín de dos colores (pie azul, caña blanca) puede quedar en dos máscaras aceptadas,
+  // una por color, porque SAM puntúa mejor cada parte. Si SAM también propuso la máscara del
+  // calcetín entero (que contiene a las dos) y no es más grande que un calcetín típico, se usa esa.
+  function unirTrozos(aceptadas, cands) {
+    if (aceptadas.length < 3) return aceptadas;
+    const areas = aceptadas.map((c) => c.a).sort((p, q) => p - q);
+    const tipica = areas[areas.length >> 1];
+    let res = aceptadas.slice();
+    const porArea = cands.filter((c) => !res.includes(c) && c.a <= CFG.unoMax * tipica).sort((p, q) => q.s - p.s);
+    for (const U of porArea) {
+      const dentro = res.filter((d) => d.a < U.a && interseccion(d.m, U.m) >= 0.85 * d.a);
+      if (dentro.length < 2) continue;
+      // U no puede pisar mucho a otras máscaras aceptadas
+      const fuera = res.filter((d) => !dentro.includes(d) && interseccion(d.m, U.m) > CFG.solape * Math.min(d.a, U.a));
+      if (fuera.length) continue;
+      const cubre = dentro.reduce((t, d) => t + d.a, 0);
+      if (cubre < 0.7 * U.a) continue;
+      res = res.filter((d) => !dentro.includes(d));
+      res.push(U);
+    }
+    return res;
+  }
+
   // Si una máscara aceptada es la suma de dos o más máscaras que SAM también propuso
-  // por separado y que tienen colores claramente distintos, son calcetines distintos: se divide.
+  // por separado, puede ser que haya juntado dos calcetines. Se divide si cada parte tiene
+  // tamaño de calcetín y, además, sus colores son claramente distintos o la máscara es tan
+  // grande como dos calcetines. Un calcetín de dos colores (pie azul y caña blanca) no se
+  // divide: cada color es solo una parte del calcetín.
   function dividirMezclas(aceptadas, cands, lab, total) {
     const res = [];
+    const areas = aceptadas.map((c) => c.a).sort((p, q) => p - q);
+    const tipica = areas.length ? areas[areas.length >> 1] : 0;
     for (const M of aceptadas) {
       const partes = cands
         .filter((c) => c !== M && c.a >= 0.2 * M.a && c.a <= 0.85 * M.a)
@@ -272,7 +381,9 @@
         for (let i = 0; i < colores.length; i++) for (let j = i + 1; j < colores.length; j++) {
           maxDif = Math.max(maxDif, Math.hypot(colores[i][0] - colores[j][0], colores[i][1] - colores[j][1], colores[i][2] - colores[j][2]));
         }
-        dividir = cubre >= 0.75 * M.a && maxDif >= CFG.difColorDividir;
+        const partesGrandes = elegidas.every((c) => c.a >= CFG.parteDividir * tipica);
+        dividir = cubre >= 0.75 * M.a && partesGrandes &&
+          (M.a >= CFG.dobleDividir * tipica || (M.a > CFG.unoMax * tipica && maxDif >= CFG.difColorDividir));
       }
       if (dividir) res.push(...elegidas);
       else res.push(M);
@@ -633,7 +744,7 @@
 
   const VERSION_HUELLA = 'dinov2s-q8-plegado224-v1';
   // Cambia cuando cambia la forma de calcular el parecido (para aprender solo de datos comparables)
-  const METRICA = 'dino-top20+colores-dibujo-v1';
+  const METRICA = 'dino-top25+cobertura+colores-dibujo-v2';
 
   function aBase64(bytes) {
     let s = '';
@@ -750,7 +861,8 @@
    * Matriz de parecidos entre todos los calcetines (los nFoto primeros son de la foto,
    * el resto del cajón). Para cada parche de A se busca su mejor parche en B (en las dos
    * orientaciones de B); se compara con lo que ese parche se parece al resto de calcetines
-   * (mediana) y cuentan los CFG.topk trozos más distintivos.
+   * (mediana). Cuenta la media del CFG.topFrac de trozos que mejor encajan más la parte del
+   * calcetín que encaja (cobertura).
    *
    * nBase (opcional): los nBase primeros son la foto y el cajón; los siguientes son las
    * parejas conocidas del catálogo. El catálogo no cuenta como «resto de calcetines» (no
@@ -821,10 +933,11 @@
         if (b === a) continue;
         for (let p = 0; p < P; p++) z[p] = mejor[a][b][p] - ref[p];
         z.sort();
-        const k = Math.min(CFG.topk, P);
-        let suma = 0;
+        const k = Math.max(1, Math.round(CFG.topFrac * P));
+        let suma = 0, encajan = 0;
         for (let i = P - k; i < P; i++) suma += z[i];
-        S[a][b] = suma / k;
+        for (let i = 0; i < P; i++) if (z[i] > CFG.cobDelta) encajan++;
+        S[a][b] = suma / k + CFG.cobPeso * (encajan / P - CFG.cobCentro);
       }
     }
     for (let a = 0; a < n; a++) {
